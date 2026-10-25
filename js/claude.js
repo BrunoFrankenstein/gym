@@ -26,8 +26,17 @@ const SCHEMA = `{
         { "nombre": "Press de pecho en máquina", "equipo": "Press de pecho", "series": 3,
           "repsMin": 8, "repsMax": 12, "rir": 2, "pesoKg": 40, "descansoSeg": 120, "notas": "" }
       ],
-      "carrera": { "tipo": "rodaje", "distanciaKm": 6, "duracionMin": null, "ritmo": "5:45/km",
-                   "descripcion": "Zona 2, conversacional" }
+      "carrera": { "tipo": "intervalos", "distanciaKm": 7, "duracionMin": null, "ritmo": "4:50/km",
+                   "descripcion": "6×800 m a ritmo de 10K",
+                   "pasos": {
+                     "calentamiento": { "accion": "trotar", "min": 10 },
+                     "bloques": [
+                       { "repeticiones": 6,
+                         "trabajo": { "accion": "correr", "km": 0.8, "ritmo": "4:50" },
+                         "recuperacion": { "accion": "caminar", "min": 2 } }
+                     ],
+                     "enfriamiento": { "accion": "trotar", "min": 5 }
+                   } }
     }
   ],
   "progresion": [
@@ -128,7 +137,8 @@ Cuando recomiendes subir peso, reps, series o kilómetros, explicá en una líne
       : 'Sin entrenamientos registrados todavía.'));
 
   out.push(`\n## Formato de respuesta\nPrimero explicame brevemente la lógica. Al final, incluí UN único bloque \`\`\`json con exactamente este formato (mismas claves):\n\`\`\`json\n${SCHEMA}\n\`\`\`\n` +
-    `Reglas: un día puede tener sólo "ejercicios", sólo "carrera" o ambos (omití la clave que no corresponda). Usá exactamente los mismos nombres de ejercicio que aparecen en mi historial cuando sea el mismo ejercicio (así sigo la progresión). "equipo" debe ser uno de los nombres de mi equipamiento. "rir" es el RIR objetivo de las series de trabajo. "tipo" de carrera es uno de: rodaje, intervalos, tempo, fondo, recuperación, carrera.`);
+    `Reglas: un día puede tener sólo "ejercicios", sólo "carrera" o ambos (omití la clave que no corresponda). Usá exactamente los mismos nombres de ejercicio que aparecen en mi historial cuando sea el mismo ejercicio (así sigo la progresión). "equipo" debe ser uno de los nombres de mi equipamiento. "rir" es el RIR objetivo de las series de trabajo. "tipo" de carrera es uno de: rodaje, intervalos, tempo, fondo, recuperación, carrera. ` +
+    `Cuando una carrera tenga cambios de ritmo (intervalos, correr/caminar, tempo con calentamiento), completá "pasos": lo cargo en el Apple Watch como entrenamiento personalizado, que vibra y avisa en cada cambio. Cada paso lleva "min" o "km" (uno solo), "accion" (correr, trotar o caminar) y opcionalmente "ritmo" (min/km, o un rango "5:30-5:45"). Para un rodaje continuo omití "pasos".`);
 
   return out.join('\n');
 }
@@ -192,9 +202,28 @@ export function parseResponse(text) {
         durationMin: numOrNull(d.carrera.duracionMin),
         pace: d.carrera.ritmo || '',
         description: d.carrera.descripcion || '',
+        steps: parseSteps(d.carrera.pasos),
       } : null,
     })),
   };
+}
+
+// Pasos de una carrera estructurada, con la misma forma que un entrenamiento personalizado
+// del Apple Watch: calentamiento, bloques (trabajo + recuperación × repeticiones) y
+// enfriamiento. Cada paso: { action, min, km, pace }.
+function parseSteps(p) {
+  if (!p) return null;
+  const n = v => (v == null || v === '' || isNaN(+v) ? null : +v);
+  const step = s => (s && (s.min != null || s.km != null || s.accion)
+    ? { action: s.accion || 'correr', min: n(s.min), km: n(s.km), pace: s.ritmo || '' }
+    : null);
+  const blocks = (p.bloques || []).map(b => ({
+    reps: parseInt(b.repeticiones, 10) || 1,
+    work: step(b.trabajo),
+    recovery: step(b.recuperacion),
+  })).filter(b => b.work);
+  if (!blocks.length && !p.calentamiento && !p.enfriamiento) return null;
+  return { warmup: step(p.calentamiento), blocks, cooldown: step(p.enfriamiento) };
 }
 
 // "nuevo" reemplaza la semana entera; "reorganizar" conserva las sesiones ya hechas y

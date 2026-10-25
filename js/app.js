@@ -9,6 +9,7 @@ import { suggest } from './progression.js';
 import { buildPrompt, parseResponse, applyPlan, fmtRun, runTargetText } from './claude.js';
 import { RUN_TYPES, parseDuration, fmtDuration, fmtPace, daysUntil } from './running.js';
 import * as strava from './strava.js';
+import { recipeHtml, hasSteps, buildSteps } from './watch.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -116,7 +117,7 @@ function viewHome() {
           <small class="muted">${[d.exercises.length ? `${d.exercises.length} ejercicios` : '', d.run ? runTargetText(d.run) : ''].filter(Boolean).map(esc).join(' · ')}
           ${d.status === 'hecha' ? ` · ✓ ${fmtDate(d.doneDate)}` : d.status === 'salteada' ? ' · salteada' : ''}</small></div>
         <div class="btns">${d.status === 'pendiente'
-          ? `<button class="sm primary" data-action="start-plan" data-id="${d.id}">Empezar</button><button class="sm" data-action="skip-day" data-id="${d.id}">Saltear</button>`
+          ? `${hasSteps(d.run) ? `<button class="sm" data-action="watch-recipe" data-id="${d.id}" aria-label="Cargar en el Watch">⌚</button>` : ''}<button class="sm primary" data-action="start-plan" data-id="${d.id}">Empezar</button><button class="sm" data-action="skip-day" data-id="${d.id}">Saltear</button>`
           : d.status === 'salteada' ? `<button class="sm" data-action="unskip-day" data-id="${d.id}">Deshacer</button>` : ''}</div></li>`).join('')}</ul>
       ${p.days.some(d => d.status === 'salteada') ? `<button class="block ghost" data-action="goto-reorg">Pedirle a Claude que reorganice</button>` : ''}
     </section>`;
@@ -128,7 +129,8 @@ function viewHome() {
     ? `<ul class="list">${state.templates.map(t => `<li><div><b>${esc(t.name)}</b><br><small class="muted">${t.exercises.length} ejercicios</small></div>
         <button class="sm" data-action="start-template" data-id="${t.id}">Empezar</button></li>`).join('')}</ul>`
     : `<p class="muted small">Todavía no hay planillas. Creá una en la pestaña Planillas o guardá un entrenamiento libre como planilla.</p>`}</section>
-    <div class="row two"><button class="primary big" data-action="start-free">🏋️ Gimnasio libre</button><button class="primary big" data-action="start-run">🏃 Carrera libre</button></div>`;
+    <div class="row two"><button class="primary big" data-action="start-free">🏋️ Gimnasio libre</button><button class="primary big" data-action="start-run">🏃 Carrera libre</button></div>
+    <button class="block ghost mt" data-action="watch-builder">⌚ Armar intervalos para el Watch</button>`;
   return html;
 }
 
@@ -167,6 +169,7 @@ function runCard(r) {
   return `<section class="card ex run">
     <div class="row between"><h3>🏃 Carrera</h3><button class="icon" data-action="remove-run" aria-label="Quitar carrera">✕</button></div>
     ${r.target ? `<div class="target">${esc(runTargetText(r.target))}</div>` : ''}
+    ${hasSteps(r.target) ? `<button class="sm block mt" data-action="watch-recipe-active">⌚ Cómo cargarla en el Watch</button>` : ''}
     <label>Tipo</label><select data-field="run.type">${RUN_TYPES.map(t => `<option ${r.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <div class="grid2">
       <div><label>Distancia (km)</label><input inputmode="decimal" data-field="run.distance" value="${esc(r.distance)}" placeholder="${r.target?.distanceKm ?? '8'}"></div>
@@ -724,6 +727,44 @@ const ACTIONS = {
     save(); closeSheet(); render();
   },
   'delete-race': d => { state.races = state.races.filter(r => r.id !== d.id); save(); closeSheet(); render(); },
+
+  'watch-recipe': d => {
+    const day = findPlanDay(d.id);
+    openSheet(`<h2>⌚ ${esc(day.name)}</h2><p class="muted small">${esc(runTargetText(day.run))}</p>
+      ${recipeHtml(day.run, day.name)}<button class="block mt" data-action="close-sheet">Listo</button>`);
+  },
+  'watch-recipe-active': () => {
+    const a = state.active;
+    openSheet(`<h2>⌚ ${esc(a.name)}</h2>${recipeHtml(a.run.target, a.name)}<button class="block mt" data-action="close-sheet">Listo</button>`);
+  },
+  // Armador propio de intervalos (un bloque): por defecto, correr/caminar para empezar.
+  'watch-builder': () => {
+    const unit = (id, v) => `<select id="${id}"><option value="min" ${v === 'min' ? 'selected' : ''}>min</option><option value="km" ${v === 'km' ? 'selected' : ''}>km</option></select>`;
+    const act = (id, v) => `<select id="${id}">${['correr', 'trotar', 'caminar'].map(x => `<option ${x === v ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
+    openSheet(`<h2>⌚ Armar intervalos</h2>
+      <label>Nombre</label><input id="wbName" value="Correr / caminar">
+      <label>Calentamiento (min, trotando o caminando)</label><input id="wbWu" inputmode="decimal" value="5">
+      <h4>Trabajo</h4>
+      <div class="grid3">${act('wbWa', 'correr')}<input id="wbWv" inputmode="decimal" value="3">${unit('wbWu2', 'min')}</div>
+      <label>Ritmo objetivo (opcional, ej. 6:00 o 5:50-6:10)</label><input id="wbWp" placeholder="sin alerta de ritmo">
+      <h4>Recuperación</h4>
+      <div class="grid3">${act('wbRa', 'caminar')}<input id="wbRv" inputmode="decimal" value="1">${unit('wbRu', 'min')}</div>
+      <label>Repeticiones</label><input id="wbReps" inputmode="numeric" value="6">
+      <label>Enfriamiento (min)</label><input id="wbCd" inputmode="decimal" value="5">
+      <div class="row mt"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="watch-builder-ok">Ver receta</button></div>`);
+  },
+  'watch-builder-ok': () => {
+    const v = id => $(`#${id}`).value;
+    const steps = buildSteps({
+      warmup: v('wbWu'), cooldown: v('wbCd'), reps: v('wbReps'),
+      workAction: v('wbWa'), workValue: v('wbWv'), workUnit: v('wbWu2'), workPace: v('wbWp').trim(),
+      recAction: v('wbRa'), recValue: v('wbRv'), recUnit: v('wbRu'),
+    });
+    if (!steps.blocks.length) return alert('Poné cuánto dura el tramo de trabajo (minutos o km).');
+    const name = v('wbName').trim() || 'Intervalos';
+    openSheet(`<h2>⌚ ${esc(name)}</h2>${recipeHtml({ steps }, name)}
+      <div class="row mt"><button data-action="watch-builder">← Cambiar</button><button class="primary" data-action="close-sheet">Listo</button></div>`);
+  },
 
   'strava-save-client': () => {
     const id = $('#stClientId').value.trim(), secret = $('#stSecret').value.trim();

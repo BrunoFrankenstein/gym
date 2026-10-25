@@ -114,6 +114,11 @@ ul.plain li { margin-bottom: 6px; }
 .badge { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: #2a2238; color: #cdb8ff; margin-left: 6px; vertical-align: middle; font-weight: 500; }
 .target { display: inline-block; background: #22303a; color: #9bd1ff; border-radius: 8px; padding: 2px 8px; font-size: 13px; margin: 6px 0; }
 .run .target { background: #3a2a1c; color: #fdba74; }
+.grid3 { display: grid; grid-template-columns: 1.3fr 1fr 0.9fr; gap: 8px; }
+ol.recipe { padding-left: 22px; margin: 10px 0; font-size: 15px; }
+ol.recipe > li { margin-bottom: 10px; }
+ol.recipe ul { padding-left: 18px; margin: 4px 0; }
+ol.recipe ul li { margin-bottom: 3px; }
 .badge.strava { background: #3a2418; color: #fc8a4c; }
 ol.steps { padding-left: 20px; margin: 8px 0; }
 ol.steps li { margin-bottom: 4px; }
