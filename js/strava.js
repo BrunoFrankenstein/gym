@@ -120,6 +120,23 @@ export async function fetchRuns(afterSec, skipIds) {
   return out;
 }
 
+// Si Strava no trae workout_type (Runna y el Watch no lo completan), se deduce del nombre:
+// Runna titula sus sesiones "Easy Run", "Tempo", "Intervals", "Long Run"... (+ "with Runna").
+// Se prueba en orden: lo más específico primero.
+const TYPE_BY_NAME = [
+  [/race|carrera|10k|21k|42k|marat|half/i, 'carrera'],
+  [/interval|series|repeats|fartlek|hill|cuesta|track|pista/i, 'intervalos'],
+  [/tempo|threshold|umbral|progress/i, 'tempo'],
+  [/long|fondo|largo/i, 'fondo'],
+  [/recover|recup|shake/i, 'recuperación'],
+];
+
+function guessType(d) {
+  if (TYPE_BY_WORKOUT[d.workout_type]) return TYPE_BY_WORKOUT[d.workout_type];
+  const hit = TYPE_BY_NAME.find(([re]) => re.test(d.name || ''));
+  return hit ? hit[1] : 'rodaje';
+}
+
 function toRun(d) {
   const km = Math.round(d.distance / 10) / 100; // metros → km con 2 decimales
   return {
@@ -128,7 +145,7 @@ function toRun(d) {
     startedAt: d.start_date,
     date: d.start_date_local.slice(0, 10), // fecha local del lugar donde corriste
     run: {
-      type: TYPE_BY_WORKOUT[d.workout_type] || 'rodaje',
+      type: guessType(d),
       distanceKm: km,
       durationSec: d.moving_time,   // tiempo en movimiento (sin paradas), el que usa Strava para el ritmo
       elapsedSec: d.elapsed_time,
