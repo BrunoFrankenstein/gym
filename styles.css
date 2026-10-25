@@ -1,0 +1,158 @@
+/* Tema oscuro (se usa en el gimnasio, con poca luz y el brillo bajo) y botones grandes
+   para tocar con los dedos transpirados. 44 px es el mínimo táctil que recomienda Apple. */
+:root {
+  --bg: #0f1012;
+  --card: #1a1c20;
+  --inset: #111316;
+  --line: #2a2d33;
+  --text: #f1f2f4;
+  --muted: #9097a1;
+  --accent: #4ade80;
+  --accent-ink: #06210f;
+  --danger: #f87171;
+  --run: #fb923c;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#topbar {
+  position: sticky; top: 0; z-index: 5;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  background: rgba(15, 16, 18, .92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+#topbar h1 { margin: 0; font-size: 22px; max-width: 640px; margin: 0 auto; }
+
+main { padding: 12px 16px calc(env(safe-area-inset-bottom) + 90px); max-width: 640px; margin: 0 auto; }
+
+#tabs {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 5;
+  display: flex;
+  background: rgba(20, 21, 24, .96);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+#tabs button {
+  flex: 1; background: none; border: 0; border-radius: 0; min-height: 0;
+  color: var(--muted); padding: 8px 0 6px; font-size: 11px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+#tabs button .i { font-size: 20px; filter: grayscale(1); opacity: .7; }
+#tabs button.on { color: var(--accent); }
+#tabs button.on .i { filter: none; opacity: 1; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.card.inner { background: var(--inset); padding: 10px 12px; margin: 8px 0; }
+.card.tap { cursor: pointer; }
+.card.tap:active { background: #202328; }
+.card.run { border-color: #4a3320; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+h3 { font-size: 16px; margin: 0; }
+h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 4px; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); }
+small, .small { font-size: 13px; }
+.mt { margin-top: 10px; }
+
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.two > * { flex: 1; }
+.between { justify-content: space-between; }
+.btns { display: flex; gap: 6px; flex-shrink: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+button {
+  font: inherit; color: var(--text); background: #2a2d33;
+  border: 0; border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer;
+}
+button:active { filter: brightness(1.2); }
+button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.danger { background: transparent; color: var(--danger); border: 1px solid #4a2626; }
+button.ghost { background: transparent; border: 1px solid var(--line); }
+button.sm { padding: 6px 12px; min-height: 36px; font-size: 14px; }
+button.block { width: 100%; margin-bottom: 12px; }
+button.big { min-height: 56px; font-size: 16px; }
+button.icon { background: transparent; min-height: 36px; padding: 4px 10px; color: var(--muted); }
+
+/* 16 px en los campos evita que iOS haga zoom al tocarlos. */
+input, select, textarea {
+  font: inherit; font-size: 16px; color: var(--text);
+  background: var(--inset); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: #3f7d55; }
+textarea { min-height: 110px; resize: vertical; }
+textarea.tall { min-height: 50vh; font-size: 13px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+label.check-row { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--text); margin: 14px 0; }
+label.check-row input { width: 22px; height: 22px; }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.list li.past { opacity: .5; }
+ul.plain { padding-left: 18px; margin: 6px 0; font-size: 14px; }
+ul.plain li { margin-bottom: 6px; }
+
+.day.hecha b { color: var(--accent); }
+.day.salteada { opacity: .55; }
+.day.salteada b { text-decoration: line-through; }
+
+.race-next { border-color: #4a3320; }
+.countdown { text-align: center; color: var(--run); line-height: 1; }
+.countdown b { display: block; font-size: 34px; }
+
+.badge { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: #2a2238; color: #cdb8ff; margin-left: 6px; vertical-align: middle; font-weight: 500; }
+.target { display: inline-block; background: #22303a; color: #9bd1ff; border-radius: 8px; padding: 2px 8px; font-size: 13px; margin: 6px 0; }
+.run .target { background: #3a2a1c; color: #fdba74; }
+.hint { font-size: 14px; color: #d9e4d0; background: #1d2a1f; border-radius: 8px; padding: 6px 10px; margin: 6px 0; }
+.hint.claude { background: #2a2238; color: #e3d6ff; }
+.pace { margin: 8px 0 0; color: var(--run); }
+
+.session-head { margin-bottom: 10px; }
+
+/* Grilla de series: número | kg | reps | RIR | ✓ */
+.sethead, .set { display: grid; grid-template-columns: 22px 1fr 1fr 66px 44px; gap: 6px; align-items: center; }
+.sethead { font-size: 12px; color: var(--muted); margin: 10px 0 4px; text-align: center; }
+.set { margin-bottom: 6px; }
+.set > span { text-align: center; color: var(--muted); font-size: 14px; }
+.set input, .set select { padding: 8px 4px; text-align: center; text-align-last: center; }
+.set .check { padding: 0; min-height: 40px; color: var(--muted); }
+.set.done .check { background: var(--accent); color: var(--accent-ink); }
+.set.done input, .set.done select { border-color: #2f5a3c; }
+
+/* Editor de planillas: nombre a lo ancho y los números abajo. */
+.edrow { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 36px; gap: 6px; align-items: end; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.edrow .name { grid-column: 1 / -1; }
+label.mini { margin: 0; font-size: 11px; }
+label.mini input { margin-top: 2px; padding: 8px 4px; text-align: center; }
+
+.seg { display: flex; background: var(--inset); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; background: transparent; min-height: 38px; font-size: 14px; padding: 6px; }
+.seg button.on { background: #2a2d33; }
+
+#sheet { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .55); display: flex; align-items: flex-end; }
+#sheet[hidden] { display: none; }
+#sheet .panel {
+  background: var(--card); width: 100%; max-width: 640px; margin: 0 auto;
+  max-height: 90vh; overflow: auto; -webkit-overflow-scrolling: touch;
+  border-radius: 18px 18px 0 0;
+  padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px);
+}
+
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom) + 80px);
+  background: #e8eaed; color: #111; padding: 10px 16px; border-radius: 20px;
+  z-index: 30; font-size: 14px; white-space: nowrap;
+}
+#toast[hidden] { display: none; }
