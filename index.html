@@ -10,10 +10,32 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Gym">
   <meta name="theme-color" content="#0f1012">
+  <!-- Fondo oscuro antes de que llegue styles.css: evita el destello blanco al abrir. -->
+  <style>html, body { background: #0f1012; color: #f1f2f4; }</style>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" href="icons/icon-192.png">
+  <!-- Pantallas de arranque: iOS las muestra mientras arranca la app en frío (en vez de una
+       pantalla blanca). Una por tamaño de iPhone, en puntos CSS × densidad de píxeles.
+       iOS las copia al agregar la app al inicio: para ver cambios hay que reinstalarla. -->
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1125x2436.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="icons/splash/splash-828x1792.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1242x2688.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1170x2532.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1284x2778.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1179x2556.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1290x2796.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1206x2622.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1320x2868.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1260x2736.png">
   <link rel="stylesheet" href="styles.css">
+  <!-- Pide todos los módulos a la vez; si no, el navegador descubre los imports de app.js
+       recién después de bajarlo y los pide en una segunda tanda. -->
+  <link rel="modulepreload" href="js/app.js">
+  <link rel="modulepreload" href="js/store.js">
+  <link rel="modulepreload" href="js/progression.js">
+  <link rel="modulepreload" href="js/claude.js">
+  <link rel="modulepreload" href="js/running.js">
   <title>Gym</title>
 </head>
 <body>
@@ -28,6 +50,20 @@
   </nav>
   <div id="sheet" hidden><div class="panel"></div></div>
   <div id="toast" hidden></div>
+  <script>
+    // Muestra al instante la última pantalla que viste (la guarda app.js en cada render),
+    // así no hay espera en blanco mientras cargan los módulos. Apenas app.js arranca,
+    // redibuja con los datos reales; los botones responden desde ese momento.
+    try {
+      var s = JSON.parse(localStorage.getItem('gym.shell'));
+      if (s) {
+        document.getElementById('view').innerHTML = s.html;
+        document.getElementById('title').textContent = s.title;
+        var b = document.querySelector('#tabs [data-tab="' + s.tab + '"]');
+        if (b) b.classList.add('on');
+      }
+    } catch (e) {}
+  </script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

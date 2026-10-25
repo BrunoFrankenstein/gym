@@ -3,7 +3,7 @@
 // versión nueva. Consecuencia: cuando publicás un cambio, aparece en la SEGUNDA apertura.
 // Subí CACHE (gym-v2, v3…) si cambiás la lista de archivos.
 
-const CACHE = 'gym-v2';
+const CACHE = 'gym-v3';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/store.js', 'js/progression.js', 'js/claude.js', 'js/running.js',

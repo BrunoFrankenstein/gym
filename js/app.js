@@ -78,6 +78,9 @@ function render() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
   $('#title').textContent = ui.tab === 'entrenar' && state.active ? state.active.name : TITLES[ui.tab];
   $('#view').innerHTML = VIEWS[ui.tab]();
+  // Foto de la pantalla para que index.html la muestre al instante en la próxima apertura,
+  // mientras todavía cargan los módulos (ver el script inline al final de index.html).
+  try { localStorage.setItem('gym.shell', JSON.stringify({ tab: ui.tab, title: $('#title').textContent, html: $('#view').innerHTML })); } catch {}
 }
 
 const VIEWS = {
