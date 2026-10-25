@@ -52,7 +52,14 @@ const fmtSet = s => `${s.weight ?? 0}×${s.reps}${s.rir != null ? '@' + s.rir : 
 export function fmtRun(r) {
   const parts = [r.distanceKm ? `${r.distanceKm} km` : null, r.durationSec ? `en ${fmtDuration(r.durationSec)}` : null];
   const pace = fmtPace(r.durationSec, r.distanceKm);
-  return `${r.type}: ${parts.filter(Boolean).join(' ')}${pace ? ` (${pace})` : ''}${r.rpe ? `, RPE ${r.rpe}` : ''}${r.notes ? `, ${r.notes}` : ''}`;
+  return `${r.type}: ${parts.filter(Boolean).join(' ')}${pace ? ` (${pace})` : ''}${r.avgHr ? `, FC media ${r.avgHr}${r.maxHr ? `/máx ${r.maxHr}` : ''}` : ''}${r.rpe ? `, RPE ${r.rpe}` : ''}${r.notes ? `, ${r.notes}` : ''}`;
+}
+
+// Para Claude: ritmo (y FC si hay) de cada km, que muestra si el ritmo fue parejo, si hubo
+// intervalos o si la FC se fue subiendo con el mismo ritmo (deriva cardíaca = fatiga).
+function fmtSplits(splits) {
+  if (!splits?.length) return '';
+  return splits.map(s => fmtDuration(s.km ? s.sec / s.km : s.sec) + (s.hr ? `@${s.hr}` : '')).join(', ');
 }
 
 export function runTargetText(t) {
@@ -112,7 +119,10 @@ Cuando recomiendes subir peso, reps, series o kilómetros, explicá en una líne
     (recent.length
       ? recent.map(s => {
           const lines = s.exercises.map(e => `  ${e.name}: ${e.sets.map(fmtSet).join(', ')}`);
-          if (s.run) lines.push(`  Carrera ${fmtRun(s.run)}`);
+          if (s.run) {
+            lines.push(`  Carrera ${fmtRun(s.run)}`);
+            if (s.run.splits?.length) lines.push(`    parciales por km (ritmo@FC): ${fmtSplits(s.run.splits)}`);
+          }
           return `${s.date} · ${s.name}\n${lines.join('\n')}`;
         }).join('\n')
       : 'Sin entrenamientos registrados todavía.'));

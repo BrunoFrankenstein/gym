@@ -25,6 +25,8 @@ export const DEFAULT = () => ({
   sessions: [],      // entrenamientos terminados, en orden cronológico
   active: null,      // entrenamiento en curso (se guarda a cada cambio para no perder nada)
   lastExport: null,
+  stravaImported: [], // IDs de actividades de Strava ya traídas (aunque después las borres)
+  stravaLastSync: null,
 });
 
 export let state = load();

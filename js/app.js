@@ -8,6 +8,7 @@ import { state, save, replaceState, uid, localDate, activeGym, norm } from './st
 import { suggest } from './progression.js';
 import { buildPrompt, parseResponse, applyPlan, fmtRun, runTargetText } from './claude.js';
 import { RUN_TYPES, parseDuration, fmtDuration, fmtPace, daysUntil } from './running.js';
+import * as strava from './strava.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -184,12 +185,15 @@ function paceText(r) {
 }
 
 function viewHistory() {
-  if (!state.sessions.length) return `<section class="card"><p class="muted">Todavía no hay entrenamientos guardados.</p></section>`;
-  return [...state.sessions].reverse().map(s => {
+  const sync = strava.isConnected()
+    ? `<button class="block ghost" data-action="strava-import">↻ Traer carreras de Strava${state.stravaLastSync ? ` <small class="muted">(última: ${fmtDate(localDate(state.stravaLastSync))})</small>` : ''}</button>`
+    : '';
+  if (!state.sessions.length) return sync + `<section class="card"><p class="muted">Todavía no hay entrenamientos guardados.</p></section>`;
+  return sync + [...state.sessions].reverse().map(s => {
     const nSets = s.exercises.reduce((t, e) => t + e.sets.length, 0);
     const bits = [s.exercises.length ? `${s.exercises.length} ejercicios · ${nSets} series` : '', s.run ? fmtRun(s.run) : ''].filter(Boolean);
     return `<section class="card tap" data-action="open-session" data-id="${s.id}">
-      <div class="row between"><b>${esc(s.name)}</b><small class="muted">${fmtDate(s.date)}</small></div>
+      <div class="row between"><b>${esc(s.name)}${s.source?.kind === 'strava' ? '<span class="badge strava">Strava</span>' : ''}</b><small class="muted">${fmtDate(s.date)}</small></div>
       <small class="muted">${bits.map(esc).join(' · ')}</small></section>`;
   }).join('');
 }
@@ -246,11 +250,99 @@ function viewGym() {
     <label>Running: volumen actual y marcas</label><textarea data-field="profile.runNotes" placeholder="Ej: corro ~20 km/semana; 10K en 52 min (marzo 2026)">${esc(p.runNotes)}</textarea>
     <label>Lesiones, preferencias, horarios</label><textarea data-field="profile.notes" placeholder="Ej: molestia en hombro izquierdo; prefiero no hacer sentadilla libre">${esc(p.notes)}</textarea>
   </section>
+  ${stravaSection()}
   <section class="card"><h2>Respaldo</h2><p class="muted small">Los datos viven sólo en este teléfono. Exportá un respaldo cada tanto (a Archivos o iCloud Drive).
     ${state.lastExport ? `Último: ${fmtDate(localDate(state.lastExport))}.` : 'Todavía no exportaste ninguno.'}</p>
     <div class="row"><button data-action="export">Exportar</button><button data-action="import">Importar</button></div>
     <input type="file" id="importFile" accept="application/json,.json" hidden></section>`;
   return html;
+}
+
+function stravaSection() {
+  const a = strava.getAuth();
+  if (strava.isConnected()) {
+    return `<section class="card"><h2>Strava</h2>
+      <p class="small">Conectado${a.athlete ? ` como <b>${esc(a.athlete)}</b>` : ''} ✓. Las carreras nuevas se traen solas al abrir la app.</p>
+      <div class="row"><button data-action="strava-import">↻ Traer ahora</button><button class="ghost" data-action="strava-disconnect">Desconectar</button></div></section>`;
+  }
+  if (!a?.clientId) {
+    return `<section class="card"><h2>Strava</h2>
+      <p class="muted small">Para traer tus carreras (las que el Watch sube a Strava) necesitás crear una "app" personal en Strava, una sola vez:</p>
+      <ol class="small steps">
+        <li>Entrá a <b>strava.com/settings/api</b> (desde la PC es más cómodo).</li>
+        <li>Nombre: <i>Gym personal</i> · Categoría: <i>Training</i> · Sitio web: <i>${esc(location.origin)}</i>.</li>
+        <li><b>Authorization Callback Domain:</b> <code>${esc(location.hostname)}</code></li>
+        <li>Copiá el <b>Client ID</b> y el <b>Client Secret</b> acá abajo.</li>
+      </ol>
+      <label>Client ID</label><input id="stClientId" inputmode="numeric" autocomplete="off">
+      <label>Client Secret</label><input id="stSecret" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="muted small">Quedan guardados sólo en este teléfono y no se incluyen en los respaldos.</p>
+      <button class="primary block mt" data-action="strava-save-client">Guardar y conectar</button></section>`;
+  }
+  return `<section class="card"><h2>Strava</h2>
+    <button class="primary block" data-action="strava-connect">Conectar con Strava</button>
+    <p class="muted small">Si después de autorizar te quedó abierto Safari con un código, copialo y pegalo acá:</p>
+    <div class="row"><input id="stCode" placeholder="Código de Strava" autocomplete="off" autocapitalize="off" style="flex:1"><button data-action="strava-paste-code">Pegar código</button></div>
+    <button class="sm ghost mt" data-action="strava-forget-client">Cambiar Client ID / Secret</button></section>`;
+}
+
+// Trae las carreras nuevas de Strava al historial. `quiet` = importación automática al
+// abrir la app: sin avisos si no hay nada nuevo ni alertas si falla (p. ej. sin señal).
+let importing = false;
+async function importStrava(quiet = false) {
+  if (importing || !strava.isConnected()) return;
+  importing = true;
+  if (!quiet) toast('Buscando carreras en Strava…');
+  try {
+    // Primera vez: últimos 60 días. Después: desde la última sincronización menos un día,
+    // por si una actividad se subió tarde (el Watch a veces sincroniza horas después).
+    const from = state.stravaLastSync ? Date.parse(state.stravaLastSync) - 864e5 : Date.now() - 60 * 864e5;
+    const runs = await strava.fetchRuns(Math.floor(from / 1000), new Set(state.stravaImported));
+    const marked = [];
+    for (const r of runs) {
+      const session = {
+        id: uid(), date: r.date, startedAt: r.startedAt,
+        endedAt: new Date(Date.parse(r.startedAt) + r.run.elapsedSec * 1000).toISOString(),
+        name: r.name, source: { kind: 'strava', id: r.stravaId }, exercises: [], run: r.run,
+      };
+      state.sessions.push(session);
+      state.stravaImported.push(r.stravaId);
+      const day = matchPlanDay(r.date);
+      if (day) { Object.assign(day, { status: 'hecha', sessionId: session.id, doneDate: r.date }); marked.push(day.name); }
+    }
+    // El historial se asume en orden cronológico (lastPerformance recorre desde el final).
+    state.sessions.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+    state.stravaLastSync = new Date().toISOString();
+    save();
+    render();
+    if (runs.length || !quiet) {
+      toast(runs.length ? `${runs.length} carrera${runs.length > 1 ? 's' : ''} de Strava${marked.length ? ` · marcado: ${marked.join(', ')}` : ''}` : 'No hay carreras nuevas en Strava');
+    }
+  } catch (e) {
+    if (!quiet) alert(e.message);
+  } finally {
+    importing = false;
+  }
+}
+
+// Una carrera de Strava completa la sesión pendiente del plan que tenga carrera y caiga el
+// mismo día de la semana (los días del plan se llaman "Lunes", "Miércoles", etc.).
+function matchPlanDay(isoDate) {
+  if (!state.plan) return null;
+  const weekday = norm(new Date(isoDate + 'T00:00').toLocaleDateString('es-UY', { weekday: 'long' }));
+  const strip = s => norm(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return state.plan.days.find(d => d.status === 'pendiente' && d.run && strip(d.label).startsWith(strip(weekday))) || null;
+}
+
+async function connectWithCode(code) {
+  try {
+    await strava.exchangeCode(code);
+    toast('Strava conectado ✓');
+    render();
+    importStrava();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 const MODE_HELP = {
@@ -420,7 +512,8 @@ function raceForm(r = null) {
 
 function sessionDetail(s) {
   openSheet(`<h2>${esc(s.name)}</h2><p class="muted small">${fmtDate(s.date)} · ${fmtTime(s.startedAt)}–${fmtTime(s.endedAt)}</p>
-    ${s.run ? `<div class="card inner">🏃 ${esc(fmtRun(s.run))}</div>` : ''}
+    ${s.run ? `<div class="card inner">🏃 ${esc(fmtRun(s.run))}${s.run.elevGain ? `<br><small class="muted">Desnivel +${s.run.elevGain} m</small>` : ''}
+      ${s.run.splits?.length ? `<div class="splits">${s.run.splits.map((p, i) => `<span>km ${i + 1}</span><span>${fmtPace(p.sec, p.km)}</span><span>${p.hr ? `${p.hr} ppm` : ''}</span>`).join('')}</div>` : ''}</div>` : ''}
     ${s.exercises.map(e => `<div class="card inner"><b>${esc(e.name)}</b><br><small>${fmtSets(e.sets)}</small></div>`).join('')}
     <div class="row between mt"><button class="danger" data-action="delete-session" data-id="${s.id}">Borrar</button>
       <div class="btns">${s.exercises.length ? `<button data-action="session-to-template" data-id="${s.id}">Guardar como planilla</button>` : ''}<button data-action="close-sheet">Cerrar</button></div></div>`);
@@ -632,6 +725,21 @@ const ACTIONS = {
   },
   'delete-race': d => { state.races = state.races.filter(r => r.id !== d.id); save(); closeSheet(); render(); },
 
+  'strava-save-client': () => {
+    const id = $('#stClientId').value.trim(), secret = $('#stSecret').value.trim();
+    if (!/^\d+$/.test(id) || secret.length < 20) return alert('Revisá los datos: el Client ID son sólo números y el Client Secret es un texto largo (40 caracteres).');
+    strava.saveClient(id, secret);
+    ACTIONS['strava-connect']();
+  },
+  'strava-connect': () => { location.href = strava.authorizeUrl(); },
+  'strava-paste-code': () => { const c = $('#stCode').value.trim(); if (c) connectWithCode(c); },
+  'strava-forget-client': () => { if (confirm('¿Borrar el Client ID y Secret guardados?')) { localStorage.removeItem('gym.strava'); render(); } },
+  'strava-import': () => importStrava(false),
+  'strava-disconnect': () => {
+    if (!confirm('¿Desconectar Strava? Las carreras ya importadas quedan en el historial.')) return;
+    strava.disconnect(); render();
+  },
+
   export: exportData,
   import: () => $('#importFile').click(),
 
@@ -752,3 +860,15 @@ if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(locatio
 navigator.storage?.persist?.();
 
 render();
+
+// Strava: si strava.html dejó un código (misma app/almacenamiento), se canjea; si ya está
+// conectado, se traen las carreras nuevas. Se repite al volver a la app (iOS la deja
+// suspendida en segundo plano), como mucho cada 30 minutos.
+function stravaOnOpen() {
+  const code = strava.takePendingCode();
+  if (code && strava.getAuth()?.clientId) return connectWithCode(code);
+  const last = state.stravaLastSync ? Date.parse(state.stravaLastSync) : 0;
+  if (strava.isConnected() && Date.now() - last > 30 * 60e3) importStrava(true);
+}
+stravaOnOpen();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') stravaOnOpen(); });

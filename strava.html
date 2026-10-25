@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1012">
+  <link rel="stylesheet" href="styles.css">
+  <title>Strava · Gym</title>
+</head>
+<body>
+  <!-- Página de retorno de Strava. Recibe ?code=... después de autorizar.
+       En la PC (o si iOS la abre dentro de la app) comparte almacenamiento con la app:
+       deja el código y vuelve sola. En iPhone, si se abrió en Safari, Safari y la app
+       instalada no comparten datos, así que muestra el código para copiarlo y pegarlo. -->
+  <main id="view" style="padding-top: calc(env(safe-area-inset-top) + 24px)"></main>
+  <script>
+    var p = new URLSearchParams(location.search);
+    var code = p.get('code');
+    var err = p.get('error');
+    var view = document.getElementById('view');
+    var standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+
+    if (err || !code) {
+      view.innerHTML = '<section class="card"><h2>No se conectó Strava</h2><p class="muted">' +
+        (err === 'access_denied' ? 'Cancelaste la autorización.' : 'Strava no devolvió un código.') +
+        ' Volvé a la app y tocá "Conectar con Strava" de nuevo.</p><a href="./"><button class="block">Volver a la app</button></a></section>';
+    } else if (!/activity:read/.test(p.get('scope') || '')) {
+      view.innerHTML = '<section class="card"><h2>Falta un permiso</h2><p class="muted">Para leer tus carreras hay que dejar marcada la casilla de ver tus actividades. Volvé a la app y conectá de nuevo.</p><a href="./"><button class="block">Volver a la app</button></a></section>';
+    } else {
+      try { localStorage.setItem('gym.stravaCode', code); } catch (e) {}
+      if (standalone) {
+        location.replace('./');
+      } else {
+        view.innerHTML = '<section class="card"><h2>Strava autorizado ✓</h2>' +
+          '<p>Si usás la app instalada en el iPhone: copiá este código, abrí la app desde el ícono y pegalo en <b>Gimnasio y perfil → Strava → Pegar código</b>.</p>' +
+          '<input id="c" readonly value="' + code.replace(/[^\w]/g, '') + '" style="font-family: monospace; text-align:center">' +
+          '<button class="primary block mt" id="copy">Copiar código</button>' +
+          '<p class="muted small">El código sirve una sola vez y vence en unos minutos.</p>' +
+          '<a href="./"><button class="block ghost">Seguir en este navegador</button></a></section>';
+        document.getElementById('copy').onclick = function () {
+          var i = document.getElementById('c');
+          i.select();
+          (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject())
+            .catch(function () { document.execCommand('copy'); })
+            .finally(function () { document.getElementById('copy').textContent = 'Copiado ✓'; });
+        };
+      }
+    }
+  </script>
+</body>
+</html>
