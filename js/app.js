@@ -270,6 +270,7 @@ function viewClaude() {
     <section class="card"><h2>2 · Pegá la respuesta</h2>
       <textarea data-field="ui.resp" id="claudeResp" placeholder="Pegá acá la respuesta completa de Claude">${esc(ui.resp)}</textarea>
       <div class="row mt"><button data-action="paste-clip">Pegar del portapapeles</button><button class="primary" data-action="parse-resp">Revisar y aplicar</button></div></section>
+    <button class="block ghost" data-action="published-plans">📥 Planes publicados</button>
     ${p ? `<section class="card"><h2>Plan actual</h2>
       ${p.summary ? `<p class="small">${esc(p.summary)}</p>` : ''}${p.notes ? `<p class="muted small">${esc(p.notes)}</p>` : ''}
       ${p.progression.length ? `<h4>Progresión sugerida</h4><ul class="plain">${p.progression.map(x => `<li><b>${esc(x.exercise)}:</b> ${esc(x.advice)}</li>`).join('')}</ul>` : ''}
@@ -426,6 +427,7 @@ function previewPlan(parsed) {
   openSheet(`<h2>${parsed.mode === 'reorganizar' ? 'Reorganización' : 'Plan nuevo'}</h2>
     ${parsed.summary ? `<p class="small">${esc(parsed.summary)}</p>` : ''}
     ${parsed.mode === 'reorganizar' ? '<p class="muted small">Se conservan las sesiones ya hechas y se reemplaza el resto.</p>' : '<p class="muted small">Reemplaza el plan actual.</p>'}
+    ${parsed.gym ? `<div class="card inner">🏢 <b>${esc(parsed.gym.name)}</b> · ${parsed.gym.equipment.length} equipos<br><small class="muted">Se crea (o completa) y queda como gimnasio activo.</small></div>` : ''}
     ${parsed.days.map(d => `<div class="card inner"><b>${esc(d.label)} · ${esc(d.name)}</b>
       ${d.run ? `<br><small>🏃 ${esc(runTargetText(d.run))}</small>` : ''}
       ${d.exercises.length ? `<br><small class="muted">${d.exercises.map(e => `${esc(e.name)} ${e.sets}×${e.repMin}${e.repMax !== e.repMin ? '–' + e.repMax : ''}${e.weight != null ? ` (${e.weight} kg)` : ''}`).join(' · ')}</small>` : ''}</div>`).join('')}
@@ -649,6 +651,34 @@ const ACTIONS = {
       render();
     } catch {
       toast('No pude leer el portapapeles: pegá a mano en el cuadro');
+    }
+  },
+  // Planes publicados junto con la app en planes/ (los arma Claude Code en la PC). Sirve
+  // para pasar rutinas al teléfono sin copiar y pegar. Se leen siempre de la red, porque
+  // la gracia es ver los que se acaban de publicar.
+  'published-plans': async () => {
+    try {
+      const r = await fetch('planes/index.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error(`respuesta ${r.status}`);
+      const list = await r.json();
+      openSheet(`<h2>Planes publicados</h2>
+        ${list.length ? `<ul class="list">${list.map(p => `<li><div><b>${esc(p.titulo)}</b><br><small class="muted">${esc(p.descripcion || '')}</small></div>
+          <button class="sm primary" data-action="load-published" data-file="${esc(p.archivo)}">Ver</button></li>`).join('')}</ul>` : '<p class="muted">No hay planes publicados.</p>'}
+        <button class="block mt" data-action="close-sheet">Cerrar</button>`);
+    } catch (e) {
+      alert(`No pude leer los planes publicados (${e.message}). Necesitás internet para esto.`);
+    }
+  },
+  'load-published': async d => {
+    // Sólo archivos de planes/ de este mismo sitio, nunca una URL externa.
+    if (!/^[\w-]+\.json$/.test(d.file)) return alert('Nombre de archivo de plan inválido.');
+    try {
+      const r = await fetch(`planes/${d.file}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`no encontré ${d.file}`);
+      ui.parsed = parseResponse(await r.text());
+      previewPlan(ui.parsed);
+    } catch (e) {
+      alert(`No se pudo cargar el plan: ${e.message}.`);
     }
   },
   'parse-resp': () => {

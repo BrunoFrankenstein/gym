@@ -3,7 +3,7 @@
 // versión nueva. Consecuencia: cuando publicás un cambio, aparece en la SEGUNDA apertura.
 // Subí CACHE (gym-v2, v3…) si cambiás la lista de archivos.
 
-const CACHE = 'gym-v1';
+const CACHE = 'gym-v2';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/store.js', 'js/progression.js', 'js/claude.js', 'js/running.js',
@@ -25,6 +25,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  // Los planes publicados se piden siempre a la red: lo que importa es ver el último.
+  if (url.pathname.includes('/planes/')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
   e.respondWith(
     caches.open(CACHE).then(async cache => {
       const cached = await cache.match(e.request, { ignoreSearch: true });

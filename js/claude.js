@@ -145,7 +145,16 @@ export function parseResponse(text) {
 
   const int = v => (v == null || v === '' ? null : parseInt(v, 10));
   const numOrNull = v => (v == null || v === '' || isNaN(+v) ? null : +v);
+  // Opcional: un plan puede traer también el gimnasio con su equipamiento, para cargar
+  // todo de una vez (por ejemplo al cambiarte de gimnasio).
+  const g = data.gimnasio;
   return {
+    gym: g && g.nombre && Array.isArray(g.equipamiento) ? {
+      name: g.nombre,
+      equipment: g.equipamiento.filter(e => e.nombre).map(e => ({
+        name: e.nombre, kind: e.tipo || 'máquina', increment: numOrNull(e.escalon) ?? 2.5, notes: e.notas || '',
+      })),
+    } : null,
     mode: data.modo === 'reorganizar' ? 'reorganizar' : 'nuevo',
     summary: data.resumen || '',
     notes: data.notas || '',
@@ -181,6 +190,20 @@ export function parseResponse(text) {
 // "nuevo" reemplaza la semana entera; "reorganizar" conserva las sesiones ya hechas y
 // reemplaza el resto por lo que propuso Claude.
 export function applyPlan(parsed, alsoTemplates) {
+  if (parsed.gym) {
+    // Si ya existe un gimnasio con ese nombre, se le suman los equipos que falten (no se
+    // pisa lo que hayas editado); si no, se crea. En ambos casos queda como activo.
+    let gym = state.gyms.find(x => x.name.trim().toLowerCase() === parsed.gym.name.trim().toLowerCase());
+    if (!gym) {
+      gym = { id: uid(), name: parsed.gym.name, equipment: [] };
+      state.gyms.push(gym);
+    }
+    const have = new Set(gym.equipment.map(e => e.name.trim().toLowerCase()));
+    for (const e of parsed.gym.equipment) {
+      if (!have.has(e.name.trim().toLowerCase())) gym.equipment.push({ id: uid(), ...e });
+    }
+    state.activeGymId = gym.id;
+  }
   const newDays = parsed.days.map(d => ({ ...d, id: uid(), status: 'pendiente' }));
   const keep = parsed.mode === 'reorganizar' && state.plan ? state.plan.days.filter(d => d.status === 'hecha') : [];
   state.plan = {

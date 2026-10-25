@@ -1,0 +1,85 @@
+{
+  "tipo": "plan-gym",
+  "modo": "nuevo",
+  "resumen": "Semana 1 en Enfoque: cuerpo completo lunes, miércoles y viernes, 45 min. Cada grupo muscular se trabaja 2-3 veces por semana con 15-16 series por sesión. Es semana de calibración: elegí pesos que te dejen el RIR indicado (2-3 reps en reserva) y anotá todo, con eso se ajusta la semana 2.",
+  "gimnasio": {
+    "nombre": "Enfoque Ciudad Deportiva",
+    "equipamiento": [
+      { "nombre": "Rack de potencia", "tipo": "peso libre", "escalon": 2.5, "notas": "Eleiko, con barra olímpica de 20 kg" },
+      { "nombre": "Plataforma de levantamiento", "tipo": "peso libre", "escalon": 2.5, "notas": "Eleiko" },
+      { "nombre": "Barra olímpica", "tipo": "peso libre", "escalon": 2.5, "notas": "20 kg, discos de 1,25 kg en adelante" },
+      { "nombre": "Barra hexagonal", "tipo": "peso libre", "escalon": 2.5, "notas": "" },
+      { "nombre": "Mancuernas", "tipo": "peso libre", "escalon": 2, "notas": "Eleiko" },
+      { "nombre": "Kettlebells", "tipo": "peso libre", "escalon": 4, "notas": "" },
+      { "nombre": "Banco plano", "tipo": "peso libre", "escalon": 0, "notas": "" },
+      { "nombre": "Banco ajustable", "tipo": "peso libre", "escalon": 0, "notas": "inclinado / declinado" },
+      { "nombre": "Máquina Smith", "tipo": "máquina", "escalon": 2.5, "notas": "" },
+      { "nombre": "Prensa de piernas", "tipo": "máquina", "escalon": 5, "notas": "Technogym" },
+      { "nombre": "Hack squat", "tipo": "máquina", "escalon": 2.5, "notas": "de discos" },
+      { "nombre": "Extensión de cuádriceps", "tipo": "máquina", "escalon": 5, "notas": "Technogym" },
+      { "nombre": "Curl femoral sentado", "tipo": "máquina", "escalon": 5, "notas": "Technogym" },
+      { "nombre": "Curl femoral acostado", "tipo": "máquina", "escalon": 5, "notas": "Technogym" },
+      { "nombre": "Máquina de glúteo (hip thrust)", "tipo": "máquina", "escalon": 5, "notas": "" },
+      { "nombre": "Abductores", "tipo": "máquina", "escalon": 5, "notas": "" },
+      { "nombre": "Aductores", "tipo": "máquina", "escalon": 5, "notas": "" },
+      { "nombre": "Gemelos de pie", "tipo": "máquina", "escalon": 5, "notas": "" },
+      { "nombre": "Press de pecho", "tipo": "máquina", "escalon": 5, "notas": "Technogym" },
+      { "nombre": "Pec deck", "tipo": "máquina", "escalon": 5, "notas": "aperturas / deltoides posterior" },
+      { "nombre": "Press de hombros", "tipo": "máquina", "escalon": 5, "notas": "Technogym" },
+      { "nombre": "Jalón al pecho", "tipo": "polea", "escalon": 2.5, "notas": "" },
+      { "nombre": "Remo bajo en polea", "tipo": "polea", "escalon": 2.5, "notas": "" },
+      { "nombre": "Remo sentado", "tipo": "máquina", "escalon": 5, "notas": "Technogym, con apoyo de pecho" },
+      { "nombre": "Polea doble ajustable", "tipo": "polea", "escalon": 2.5, "notas": "cruce de poleas" },
+      { "nombre": "Curl de bíceps", "tipo": "máquina", "escalon": 5, "notas": "" },
+      { "nombre": "Extensión de tríceps", "tipo": "máquina", "escalon": 5, "notas": "" },
+      { "nombre": "Dominadas asistidas", "tipo": "máquina", "escalon": 5, "notas": "el peso es la asistencia: más peso = más fácil" },
+      { "nombre": "Barra de dominadas", "tipo": "peso corporal", "escalon": 0, "notas": "" },
+      { "nombre": "Paralelas", "tipo": "peso corporal", "escalon": 0, "notas": "fondos" },
+      { "nombre": "Banco de hiperextensiones", "tipo": "peso corporal", "escalon": 0, "notas": "" },
+      { "nombre": "Cinta", "tipo": "cardio", "escalon": 0, "notas": "Technogym" },
+      { "nombre": "Bicicleta", "tipo": "cardio", "escalon": 0, "notas": "Technogym" },
+      { "nombre": "Elíptica", "tipo": "cardio", "escalon": 0, "notas": "Technogym" },
+      { "nombre": "Remo ergómetro", "tipo": "cardio", "escalon": 0, "notas": "Technogym Skillrow" }
+    ]
+  },
+  "dias": [
+    {
+      "dia": "Lunes",
+      "nombre": "Cuerpo completo A",
+      "ejercicios": [
+        { "nombre": "Sentadilla con barra", "equipo": "Rack de potencia", "series": 3, "repsMin": 6, "repsMax": 10, "rir": 3, "pesoKg": null, "descansoSeg": 150, "notas": "2 series de aproximación antes" },
+        { "nombre": "Press de banca con barra", "equipo": "Banco plano", "series": 3, "repsMin": 6, "repsMax": 10, "rir": 2, "pesoKg": null, "descansoSeg": 120, "notas": "" },
+        { "nombre": "Jalón al pecho", "equipo": "Jalón al pecho", "series": 3, "repsMin": 8, "repsMax": 12, "rir": 2, "pesoKg": null, "descansoSeg": 90, "notas": "agarre prono, al ancho de hombros" },
+        { "nombre": "Curl femoral sentado", "equipo": "Curl femoral sentado", "series": 3, "repsMin": 10, "repsMax": 15, "rir": 2, "pesoKg": null, "descansoSeg": 75, "notas": "" },
+        { "nombre": "Elevaciones laterales con mancuernas", "equipo": "Mancuernas", "series": 2, "repsMin": 12, "repsMax": 20, "rir": 1, "pesoKg": null, "descansoSeg": 60, "notas": "" },
+        { "nombre": "Crunch en polea", "equipo": "Polea doble ajustable", "series": 2, "repsMin": 10, "repsMax": 15, "rir": 2, "pesoKg": null, "descansoSeg": 60, "notas": "" }
+      ]
+    },
+    {
+      "dia": "Miércoles",
+      "nombre": "Cuerpo completo B",
+      "ejercicios": [
+        { "nombre": "Peso muerto rumano con barra", "equipo": "Barra olímpica", "series": 3, "repsMin": 6, "repsMax": 10, "rir": 3, "pesoKg": null, "descansoSeg": 150, "notas": "espalda neutra, bajar hasta sentir los isquios" },
+        { "nombre": "Press de hombros con mancuernas", "equipo": "Banco ajustable", "series": 3, "repsMin": 8, "repsMax": 12, "rir": 2, "pesoKg": null, "descansoSeg": 90, "notas": "sentado, respaldo casi vertical" },
+        { "nombre": "Remo sentado en máquina", "equipo": "Remo sentado", "series": 3, "repsMin": 8, "repsMax": 12, "rir": 2, "pesoKg": null, "descansoSeg": 90, "notas": "" },
+        { "nombre": "Prensa de piernas", "equipo": "Prensa de piernas", "series": 3, "repsMin": 10, "repsMax": 15, "rir": 2, "pesoKg": null, "descansoSeg": 120, "notas": "" },
+        { "nombre": "Curl de bíceps con mancuernas", "equipo": "Mancuernas", "series": 2, "repsMin": 10, "repsMax": 15, "rir": 1, "pesoKg": null, "descansoSeg": 60, "notas": "" },
+        { "nombre": "Extensión de tríceps en polea", "equipo": "Polea doble ajustable", "series": 2, "repsMin": 10, "repsMax": 15, "rir": 1, "pesoKg": null, "descansoSeg": 60, "notas": "con cuerda" }
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "nombre": "Cuerpo completo C",
+      "ejercicios": [
+        { "nombre": "Hip thrust con barra", "equipo": "Banco plano", "series": 3, "repsMin": 8, "repsMax": 12, "rir": 2, "pesoKg": null, "descansoSeg": 120, "notas": "o en la máquina de glúteo si está libre" },
+        { "nombre": "Press inclinado con mancuernas", "equipo": "Banco ajustable", "series": 3, "repsMin": 8, "repsMax": 12, "rir": 2, "pesoKg": null, "descansoSeg": 90, "notas": "banco a 30°" },
+        { "nombre": "Dominadas asistidas", "equipo": "Dominadas asistidas", "series": 3, "repsMin": 6, "repsMax": 10, "rir": 2, "pesoKg": null, "descansoSeg": 120, "notas": "si hacés 10 sin asistencia, pasá a la barra" },
+        { "nombre": "Extensión de cuádriceps", "equipo": "Extensión de cuádriceps", "series": 3, "repsMin": 10, "repsMax": 15, "rir": 1, "pesoKg": null, "descansoSeg": 75, "notas": "" },
+        { "nombre": "Face pull en polea", "equipo": "Polea doble ajustable", "series": 2, "repsMin": 12, "repsMax": 20, "rir": 2, "pesoKg": null, "descansoSeg": 60, "notas": "con cuerda, a la altura de la cara" },
+        { "nombre": "Gemelos de pie", "equipo": "Gemelos de pie", "series": 3, "repsMin": 10, "repsMax": 15, "rir": 1, "pesoKg": null, "descansoSeg": 60, "notas": "pausa de 1 s abajo" }
+      ]
+    }
+  ],
+  "progresion": [],
+  "notas": "Calentamiento: 5 min de bici o remo y 1-2 series livianas del primer ejercicio. Cuenta aproximada: ~16 series por sesión con los descansos indicados entra en 45 min. Si corrés, evitá poner la sesión de calidad de running el día después del lunes o el miércoles (sentadilla y peso muerto). El equipamiento es una lista típica de Technogym + Eleiko: borrá o renombrá lo que no coincida en la pestaña Gimnasio."
+}
