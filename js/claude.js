@@ -76,13 +76,17 @@ export function runTargetText(t) {
   return parts.filter(Boolean).join(' · ') + (t.description ? ` — ${t.description}` : '');
 }
 
-export function buildPrompt(mode, note = '') {
+// useProject: el pedido va a un Project de Claude que ya tiene las instrucciones de
+// coaching (js/project.js), así que se omite ese preámbulo para no duplicarlo ni
+// contradecirlo. Los datos y el formato JSON van siempre: dependen de la versión de la app.
+export function buildPrompt(mode, note = '', useProject = false) {
   const p = state.profile;
   const gym = activeGym();
   const today = new Date();
   const out = [];
 
-  out.push(`Sos mi entrenador personal de fuerza y running. Basá tus decisiones en la evidencia científica actual:
+  if (useProject) out.push(`Pedido de la app (aplicá las instrucciones del Project).`);
+  else out.push(`Sos mi entrenador personal de fuerza y running. Basá tus decisiones en la evidencia científica actual:
 - Fuerza/hipertrofia: volumen semanal por grupo muscular de ~10-20 series efectivas según nivel (Schoenfeld et al., 2017), proximidad al fallo de 0-3 RIR (Refalo et al., 2023), frecuencia de al menos 2 veces por semana por grupo muscular, sobrecarga progresiva por doble progresión.
 - Running: distribución de intensidad ~80/20 entre fácil y calidad (Seiler), aumentos graduales del volumen semanal (orientativo ~10%), especificidad hacia la distancia de la carrera objetivo, y puesta a punto (tapering) de 1-3 semanas según la distancia (Bosquet et al., 2007).
 - Entrenamiento concurrente: separá lo más posible las sesiones pesadas de piernas de las de calidad o fondo, y priorizá según la carrera más cercana de prioridad A.

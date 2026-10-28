@@ -27,6 +27,7 @@ export const DEFAULT = () => ({
   lastExport: null,
   stravaImported: [], // IDs de actividades de Strava ya traídas (aunque después las borres)
   stravaLastSync: null,
+  useProject: false,  // el pedido a Claude va a un Project con instrucciones propias
 });
 
 export let state = load();

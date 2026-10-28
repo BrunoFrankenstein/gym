@@ -10,6 +10,7 @@ import { buildPrompt, parseResponse, applyPlan, fmtRun, runTargetText } from './
 import { RUN_TYPES, parseDuration, fmtDuration, fmtPace, daysUntil } from './running.js';
 import * as strava from './strava.js';
 import { recipeHtml, hasSteps, buildSteps } from './watch.js';
+import { PROJECT_INSTRUCTIONS } from './project.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -364,11 +365,22 @@ function viewClaude() {
       <textarea data-field="ui.note" placeholder="Ej: esta semana sólo puedo martes, jueves y sábado">${esc(ui.note)}</textarea>
       <button class="primary block mt" data-action="copy-prompt">Copiar pedido</button>
       <button class="sm ghost" data-action="show-prompt">Ver el pedido</button>
-      <p class="muted small">Pegalo en una conversación nueva de Claude (app o claude.ai).</p></section>
+      <p class="muted small">${state.useProject ? 'Pegalo en una conversación nueva dentro de tu Project de Claude.' : 'Pegalo en una conversación nueva de Claude (app o claude.ai).'}</p></section>
     <section class="card"><h2>2 · Pegá la respuesta</h2>
       <textarea data-field="ui.resp" id="claudeResp" placeholder="Pegá acá la respuesta completa de Claude">${esc(ui.resp)}</textarea>
       <div class="row mt"><button data-action="paste-clip">Pegar del portapapeles</button><button class="primary" data-action="parse-resp">Revisar y aplicar</button></div></section>
     <button class="block ghost" data-action="published-plans">📥 Planes publicados</button>
+    <section class="card"><h2>Project de Claude</h2>
+      <p class="muted small">Un Project guarda las instrucciones del coach (quién sos, cómo querés progresar, cómo responder) y ordena todas las conversaciones del plan en un mismo lugar.</p>
+      <ol class="small steps">
+        <li>En Claude, creá un Project, por ejemplo "Coach gym + running".</li>
+        <li>Copiá las instrucciones con el botón de abajo y pegalas en las <b>instrucciones</b> del Project.</li>
+        <li>Activá "Uso un Project": el pedido sale más corto, porque las reglas ya están en el Project.</li>
+        <li>Cada semana, abrí una conversación nueva dentro del Project y pegá el pedido.</li>
+      </ol>
+      <button class="block" data-action="copy-project">Copiar instrucciones del Project</button>
+      <label class="check-row"><input type="checkbox" data-field="setting.useProject" ${state.useProject ? 'checked' : ''}> Uso un Project de Claude</label>
+    </section>
     ${p ? `<section class="card"><h2>Plan actual</h2>
       ${p.summary ? `<p class="small">${esc(p.summary)}</p>` : ''}${p.notes ? `<p class="muted small">${esc(p.notes)}</p>` : ''}
       ${p.progression.length ? `<h4>Progresión sugerida</h4><ul class="plain">${p.progression.map(x => `<li><b>${esc(x.exercise)}:</b> ${esc(x.advice)}</li>`).join('')}</ul>` : ''}
@@ -786,7 +798,7 @@ const ACTIONS = {
 
   'claude-mode': d => { ui.claudeMode = d.mode; render(); },
   'copy-prompt': async () => {
-    const text = buildPrompt(ui.claudeMode, ui.note);
+    const text = buildPrompt(ui.claudeMode, ui.note, state.useProject);
     try {
       await navigator.clipboard.writeText(text);
       toast('Pedido copiado: pegalo en Claude');
@@ -795,8 +807,18 @@ const ACTIONS = {
     }
   },
   'show-prompt': () => openSheet(`<h2>Pedido para Claude</h2><p class="muted small">Seleccioná todo y copialo.</p>
-    <textarea class="tall" readonly>${esc(buildPrompt(ui.claudeMode, ui.note))}</textarea>
+    <textarea class="tall" readonly>${esc(buildPrompt(ui.claudeMode, ui.note, state.useProject))}</textarea>
     <button class="block mt" data-action="close-sheet">Cerrar</button>`),
+  'copy-project': async () => {
+    try {
+      await navigator.clipboard.writeText(PROJECT_INSTRUCTIONS);
+      toast('Instrucciones copiadas: pegalas en el Project');
+    } catch {
+      openSheet(`<h2>Instrucciones del Project</h2><p class="muted small">Seleccioná todo y copialo.</p>
+        <textarea class="tall" readonly>${esc(PROJECT_INSTRUCTIONS)}</textarea>
+        <button class="block mt" data-action="close-sheet">Cerrar</button>`);
+    }
+  },
   'paste-clip': async () => {
     try {
       ui.resp = await navigator.clipboard.readText();
@@ -884,6 +906,9 @@ function onField(e) {
     state.profile[key] = ['daysPerWeek', 'runDaysPerWeek', 'sessionMinutes'].includes(key) ? (parseInt(v, 10) || 0) : v;
   } else if (scope === 'gym') {
     state.activeGymId = v; save(); render(); return;
+  } else if (scope === 'setting') {
+    state[key] = el.type === 'checkbox' ? el.checked : v;
+    save(); render(); return;
   } else if (scope === 'ui') {
     ui[key] = v; return;
   }
