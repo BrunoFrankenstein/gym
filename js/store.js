@@ -10,10 +10,15 @@ export const DEFAULT = () => ({
   version: 1,
   profile: {
     goal: 'hipertrofia',
-    experience: 'intermedio',
+    experience: 'intermedio',      // nivel en fuerza
+    runExperience: 'principiante', // nivel en running: nuevo | principiante | intermedio | avanzado
     daysPerWeek: 4,      // días de gimnasio
     runDaysPerWeek: 3,   // días de running (pueden coincidir con días de gimnasio)
+    gymDays: '',         // días fijos, si los hay (ej: "lunes, miércoles, viernes")
     sessionMinutes: 60,
+    priority: 'equilibrio',    // equilibrio | fuerza | running (una carrera A cercana manda igual)
+    progression: 'moderada',   // conservadora | moderada | agresiva
+    // Estos campos son los que el Project de Claude espera en "Mi perfil" (ver project.js).
     notes: '',
     runNotes: '',        // km semanales actuales, marcas, experiencia corriendo
   },

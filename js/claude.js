@@ -95,7 +95,11 @@ Cuando recomiendes subir peso, reps, series o kilómetros, explicá en una líne
   out.push(`\n## Pedido\nHoy es ${WEEKDAYS[today.getDay()]} ${localDate(today)}. ${REQUESTS[mode](p)}`);
   if (note.trim()) out.push(`\nComentario mío: ${note.trim()}`);
 
-  out.push(`\n## Mi perfil\n- Objetivo de fuerza: ${p.goal}\n- Experiencia: ${p.experience}\n- Días de gimnasio por semana: ${p.daysPerWeek}\n- Días de running por semana: ${p.runDaysPerWeek}\n- Tiempo por día: ~${p.sessionMinutes} min` +
+  // Este bloque es lo que el Project usa para personalizar su metodología general
+  // (project.js, sección "Cómo leer el perfil"): cada campo nuevo del perfil va acá.
+  out.push(`\n## Mi perfil\n- Objetivo de fuerza: ${p.goal}\n- Nivel en fuerza: ${p.experience}\n- Nivel en running: ${p.runExperience}` +
+    `\n- Prioridad: ${p.priority} (una carrera A cercana manda igual)\n- Ritmo de progresión: ${p.progression}` +
+    `\n- Días de gimnasio por semana: ${p.daysPerWeek}${p.gymDays ? ` (${p.gymDays})` : ''}\n- Días de running por semana: ${p.runDaysPerWeek}\n- Tiempo por día: ~${p.sessionMinutes} min` +
     (p.notes ? `\n- Notas (lesiones, preferencias): ${p.notes}` : '') +
     (p.runNotes ? `\n- Running (volumen actual, marcas): ${p.runNotes}` : ''));
 

@@ -245,11 +245,19 @@ function viewGym() {
   const sel = (field, opts) => `<select data-field="profile.${field}">${opts.map(o => `<option ${p[field] === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
   html += `<section class="card"><h2>Perfil</h2>
     <label>Objetivo de fuerza</label>${sel('goal', ['hipertrofia', 'fuerza', 'salud general', 'complemento del running'])}
-    <label>Experiencia en gimnasio</label>${sel('experience', ['principiante', 'intermedio', 'avanzado'])}
+    <div class="grid2">
+      <div><label>Nivel en fuerza</label>${sel('experience', ['principiante', 'intermedio', 'avanzado'])}</div>
+      <div><label>Nivel en running</label>${sel('runExperience', ['nuevo', 'principiante', 'intermedio', 'avanzado'])}</div>
+    </div>
+    <div class="grid2">
+      <div><label>Prioridad</label>${sel('priority', ['equilibrio', 'fuerza', 'running'])}</div>
+      <div><label>Progresión</label>${sel('progression', ['conservadora', 'moderada', 'agresiva'])}</div>
+    </div>
     <div class="grid2">
       <div><label>Días de gimnasio / semana</label><input inputmode="numeric" data-field="profile.daysPerWeek" value="${p.daysPerWeek}"></div>
       <div><label>Días de running / semana</label><input inputmode="numeric" data-field="profile.runDaysPerWeek" value="${p.runDaysPerWeek}"></div>
     </div>
+    <label>Días fijos de gimnasio (opcional)</label><input data-field="profile.gymDays" placeholder="Ej: lunes, miércoles, viernes" value="${esc(p.gymDays)}">
     <label>Minutos disponibles por día</label><input inputmode="numeric" data-field="profile.sessionMinutes" value="${p.sessionMinutes}">
     <label>Running: volumen actual y marcas</label><textarea data-field="profile.runNotes" placeholder="Ej: corro ~20 km/semana; 10K en 52 min (marzo 2026)">${esc(p.runNotes)}</textarea>
     <label>Lesiones, preferencias, horarios</label><textarea data-field="profile.notes" placeholder="Ej: molestia en hombro izquierdo; prefiero no hacer sentadilla libre">${esc(p.notes)}</textarea>
@@ -371,7 +379,7 @@ function viewClaude() {
       <div class="row mt"><button data-action="paste-clip">Pegar del portapapeles</button><button class="primary" data-action="parse-resp">Revisar y aplicar</button></div></section>
     <button class="block ghost" data-action="published-plans">📥 Planes publicados</button>
     <section class="card"><h2>Project de Claude</h2>
-      <p class="muted small">Un Project guarda las instrucciones del coach (quién sos, cómo querés progresar, cómo responder) y ordena todas las conversaciones del plan en un mismo lugar.</p>
+      <p class="muted small">Un Project guarda la metodología del coach (cuándo sobrecargar, cuándo variar, cómo progresar en running, formato de respuesta y bibliografía) y ordena todas las conversaciones del plan en un mismo lugar. Lo personal (nivel, días, prioridad, progresión) sale de tu perfil en la pestaña Gimnasio y viaja en cada pedido.</p>
       <ol class="small steps">
         <li>En Claude, creá un Project, por ejemplo "Coach gym + running".</li>
         <li>Copiá las instrucciones con el botón de abajo y pegalas en las <b>instrucciones</b> del Project.</li>
