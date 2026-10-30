@@ -5,8 +5,11 @@ sin paso de compilación: lo que está en esta carpeta es lo que se publica.
 
 ## Qué hace (MVP)
 
-- **Gimnasio y equipamiento:** cargás las máquinas de tu gimnasio. Si te cambiás de gimnasio,
-  creás otro y lo marcás como activo.
+- **Gimnasio y máquinas:** elegís de un catálogo con dibujos las máquinas que hay en tu
+  gimnasio. El peso mínimo de cada una (de a cuánto sube) se pregunta la primera vez que la
+  usás. Si te cambiás de gimnasio, creás otro y lo marcás como activo.
+- **Ficha de cada ejercicio:** dibujo de inicio y final, mapa del cuerpo con los músculos
+  principales y secundarios, pasos y consejos.
 - **Tres formas de entrenar:** libre (armás el registro sobre la marcha), desde una planilla
   propia, o siguiendo el plan semanal de Claude.
 - **Registro por serie:** peso, reps y RIR (reps en reserva). Al tocar ✓ con los campos vacíos
@@ -46,4 +49,16 @@ versión nueva en segundo plano). Si cambiás la lista de archivos, subí `CACHE
 | `js/progression.js` | Regla local de sobrecarga progresiva |
 | `js/claude.js` | Armado del pedido y lectura de la respuesta JSON |
 | `js/running.js` | Tiempos, ritmos, cuenta regresiva |
+| `js/catalog.js` | Máquinas y ejercicios (generado desde RepDB, no editar a mano) |
+| `js/exercises.js` | Búsqueda en el catálogo, URL de los dibujos y mapa de músculos |
+| `js/body.js` | Siluetas SVG del cuerpo |
 | `sw.js` | Caché para modo sin internet |
+
+## Créditos
+
+- **Exercise data by [RepDB (repdb.co)](https://repdb.co)** — nombres, músculos, pasos y dibujos
+  de los ejercicios (licencia RepDB Free Tier v1.0). Las imágenes no están en este repositorio:
+  la app las carga de exercise-dataset.com y el service worker las guarda en el teléfono.
+- **[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)**
+  — siluetas del cuerpo para el mapa de músculos (MIT, © 2022 ELABBASSI Hicham).
+- La estética está inspirada en [skulpt](https://github.com/skulptapp/skulpt); no se usó su código.

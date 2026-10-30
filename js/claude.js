@@ -8,6 +8,7 @@
 
 import { state, activeGym, localDate, uid } from './store.js';
 import { fmtDuration, fmtPace, daysUntil } from './running.js';
+import { MACHINES, EXERCISES, machineById } from './exercises.js';
 
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
@@ -111,8 +112,15 @@ Cuando recomiendes subir peso, reps, series o kilómetros, explicá en una líne
     : 'Ninguna cargada por ahora.'));
 
   if (gym && gym.equipment.length) {
-    out.push(`\n## Equipamiento de mi gimnasio actual ("${gym.name}")\nUsá SÓLO este equipamiento. El escalón es el salto mínimo de peso de cada máquina.\n` +
-      gym.equipment.map(e => `- ${e.name} (${e.kind}${e.increment ? `, escalón ${e.increment} kg` : ''}${e.notes ? `, ${e.notes}` : ''})`).join('\n'));
+    // Con cada máquina del catálogo van sus ejercicios: si Claude usa esos nombres tal cual,
+    // la app muestra el dibujo y los músculos de cada uno.
+    out.push(`\n## Equipamiento de mi gimnasio actual ("${gym.name}")\nUsá SÓLO este equipamiento (más ejercicios con el peso del cuerpo). El escalón es el salto mínimo de peso de cada máquina. ` +
+      `Cuando un ejercicio esté en la lista "ejercicios" de una máquina, usá ese nombre exacto.\n` +
+      gym.equipment.map(e => {
+        const m = machineById(e.cat);
+        return `- ${e.name} (${e.kind}${e.increment ? `, escalón ${e.increment} kg` : ''}${e.notes ? `, ${e.notes}` : ''})` +
+          (m ? ` — ejercicios: ${m.ex.map(id => EXERCISES[id].n).join('; ')}` : '');
+      }).join('\n'));
   } else {
     out.push(`\n## Equipamiento\nTodavía no cargué el equipamiento: asumí un gimnasio comercial estándar.`);
   }
@@ -180,7 +188,9 @@ export function parseResponse(text) {
     gym: g && g.nombre && Array.isArray(g.equipamiento) ? {
       name: g.nombre,
       equipment: g.equipamiento.filter(e => e.nombre).map(e => ({
-        name: e.nombre, kind: e.tipo || 'máquina', increment: numOrNull(e.escalon) ?? 2.5, notes: e.notas || '',
+        // Sin escalón queda en null: la app lo pregunta la primera vez que usás la máquina.
+        name: e.nombre, kind: e.tipo || 'máquina', increment: numOrNull(e.escalon), notes: e.notas || '',
+        cat: MACHINES.find(m => m.name.toLowerCase() === String(e.nombre).trim().toLowerCase())?.id,
       })),
     } : null,
     mode: data.modo === 'reorganizar' ? 'reorganizar' : 'nuevo',

@@ -11,6 +11,7 @@ import { RUN_TYPES, parseDuration, fmtDuration, fmtPace, daysUntil } from './run
 import * as strava from './strava.js';
 import { recipeHtml, hasSteps, buildSteps } from './watch.js';
 import { PROJECT_INSTRUCTIONS } from './project.js';
+import { MACHINES, EXERCISES, imgUrl, exerciseIdByName, machineById, machineOfExercise, exercisesForGym, MUSCLE_ES, bodySvg } from './exercises.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -24,16 +25,21 @@ const ui = {
   resp: '',
   parsed: null, // respuesta de Claude ya interpretada, esperando confirmación
   draft: null,  // planilla en edición
+  group: 'Piernas', // grupo abierto en el selector de máquinas
+  exSearch: '',     // filtro del buscador de ejercicios
 };
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
 const TITLES = { entrenar: 'Entrenar', historial: 'Historial', rutinas: 'Planillas', gym: 'Gimnasio y perfil', claude: 'Claude' };
 
-// Escalón de peso por defecto según el tipo de equipo; se puede cambiar en cada máquina.
+// Escalón de peso por defecto según el tipo de equipo, mientras no cargues el real.
 // Valores típicos de gimnasio comercial: placas de 5 kg en máquinas de placas, poleas con
 // pasos de 2,5 kg y mancuernas de a 2 kg.
 const KINDS = { 'máquina': 5, 'polea': 2.5, 'peso libre': 2, 'peso corporal': 0, 'cardio': 0, 'otro': 2.5 };
+// Opciones rápidas para cargar el escalón la primera vez que usás una máquina.
+const INC_CHOICES = [1, 1.25, 2, 2.5, 5, 10];
+const GROUPS = [...new Set(MACHINES.map(m => m.group))];
 
 // ---------- utilidades de fechas e historial ----------
 
@@ -53,10 +59,23 @@ function lastPerformance(name) {
   return null;
 }
 
-function incrementFor(ex) {
-  const eq = activeGym()?.equipment.find(e => norm(e.name) === norm(ex.target?.equipment) || norm(e.name) === norm(ex.name));
-  return eq ? eq.increment : 2.5;
+// Máquina del gimnasio con la que se hace un ejercicio: la que dice el plan ("equipo"), la
+// del catálogo a la que pertenece el ejercicio, o una con el mismo nombre que el ejercicio.
+function equipFor(ex) {
+  const list = activeGym()?.equipment || [];
+  const m = machineOfExercise(exerciseIdByName(ex.name));
+  return list.find(e => ex.target?.equipment && norm(e.name) === norm(ex.target.equipment))
+    || (m && list.find(e => e.cat === m.id))
+    || list.find(e => norm(e.name) === norm(ex.name))
+    || null;
 }
+
+// increment null = todavía no lo cargaste: se usa el típico del tipo de equipo.
+function incrementFor(ex) {
+  const eq = equipFor(ex);
+  return eq ? eq.increment ?? KINDS[eq.kind] ?? 2.5 : 2.5;
+}
+const needsIncrement = eq => eq && eq.increment == null && KINDS[eq.kind] !== 0;
 
 function suggestionFor(ex) {
   return suggest({ target: ex.target, last: lastPerformance(ex.name), increment: incrementFor(ex) });
@@ -67,7 +86,7 @@ const claudeAdvice = name => state.plan?.progression?.find(p => norm(p.exercise)
 function knownExerciseNames() {
   const names = new Map();
   const add = n => { if (n && !names.has(norm(n))) names.set(norm(n), n); };
-  activeGym()?.equipment.forEach(e => add(e.name));
+  exercisesForGym(activeGym()).forEach(id => add(EXERCISES[id].n));
   state.templates.forEach(t => t.exercises.forEach(e => add(e.name)));
   state.plan?.days.forEach(d => d.exercises.forEach(e => add(e.name)));
   state.sessions.forEach(s => s.exercises.forEach(e => add(e.name)));
@@ -112,6 +131,7 @@ function viewHome() {
   let html = nextRaceCard();
   if (p) {
     html += `<section class="card"><div class="row between"><h2>Plan de la semana</h2><small class="muted">desde ${fmtDate(p.weekStart)}</small></div>
+      <div class="week">${p.days.map(d => `<span class="dot ${d.status}">${d.status === 'hecha' ? '✓' : esc(d.label.slice(0, 2))}</span>`).join('')}</div>
       ${p.summary ? `<p class="muted small">${esc(p.summary)}</p>` : ''}
       <ul class="list">${p.days.map(d => `<li class="day ${d.status}">
         <div><b>${esc(d.label)}</b> · ${esc(d.name)} ${dayIcons(d)}<br>
@@ -150,14 +170,22 @@ function exerciseCard(ex, i) {
   const t = ex.target;
   const advice = claudeAdvice(ex.name);
   const rirOpts = s => ['', '0', '1', '2', '3', '4'].map(v => `<option value="${v}" ${String(s.rir) === v ? 'selected' : ''}>${v === '' ? '–' : v === '4' ? '4+' : v}</option>`).join('');
+  const id = exerciseIdByName(ex.name);
+  const eq = equipFor(ex);
+  const cur = ex.sets.findIndex(s => !s.done); // serie que toca ahora: va resaltada
   return `<section class="card ex">
-    <div class="row between"><h3>${esc(ex.name)}</h3><button class="icon" data-action="remove-exercise" data-i="${i}" aria-label="Quitar ejercicio">✕</button></div>
-    ${t ? `<div class="target">${t.sets}×${t.repMin}${t.repMax !== t.repMin ? '–' + t.repMax : ''}${t.rir != null ? ` · RIR ${t.rir}` : ''}${t.restSec ? ` · ${t.restSec}s` : ''}${t.notes ? ` · ${esc(t.notes)}` : ''}</div>` : ''}
+    <div class="exhead">${id ? `<button class="exthumb" data-action="exercise-info" data-id="${id}" aria-label="Cómo se hace">${thumb(id)}</button>` : ''}
+      <div class="grow"><h3>${esc(ex.name)}</h3>
+      ${t ? `<div class="target">${t.sets}×${t.repMin}${t.repMax !== t.repMin ? '–' + t.repMax : ''}${t.rir != null ? ` · RIR ${t.rir}` : ''}${t.restSec ? ` · ${t.restSec}s` : ''}${t.notes ? ` · ${esc(t.notes)}` : ''}</div>` : ''}</div>
+      <button class="icon" data-action="remove-exercise" data-i="${i}" aria-label="Quitar ejercicio">✕</button></div>
+    ${needsIncrement(eq) ? `<div class="ask"><b>¿De a cuánto sube el peso en ${esc(eq.name)}?</b>
+      <div class="chips">${INC_CHOICES.map(v => `<button class="chip" data-action="set-inc" data-id="${eq.id}" data-v="${v}">${String(v).replace('.', ',')} kg</button>`).join('')}<button class="chip" data-action="set-inc" data-id="${eq.id}" data-v="otro">otro</button></div>
+      <small class="muted">Se guarda en la máquina; la próxima no te lo pregunto.</small></div>` : ''}
     ${last ? `<div class="muted small">Última (${fmtDate(last.date)}): ${fmtSets(last.sets)}</div>` : ''}
     ${advice ? `<div class="hint claude">✨ ${esc(advice)}</div>` : ''}
     <div class="hint">💡 ${esc(sug.text)}</div>
     <div class="sethead"><span>#</span><span>kg</span><span>reps</span><span>RIR</span><span></span></div>
-    ${ex.sets.map((s, j) => `<div class="set ${s.done ? 'done' : ''}"><span>${j + 1}</span>
+    ${ex.sets.map((s, j) => `<div class="set ${s.done ? 'done' : ''} ${j === cur ? 'cur' : ''}"><span>${j + 1}</span>
       <input inputmode="decimal" data-field="set.weight" data-i="${i}" data-j="${j}" value="${esc(s.weight)}" placeholder="${sug.weight ?? 'kg'}">
       <input inputmode="numeric" data-field="set.reps" data-i="${i}" data-j="${j}" value="${esc(s.reps)}" placeholder="${sug.reps ?? 'reps'}">
       <select data-field="set.rir" data-i="${i}" data-j="${j}">${rirOpts(s)}</select>
@@ -219,17 +247,16 @@ function viewGym() {
     html += `<section class="card"><h2>Tu gimnasio</h2><p class="muted small">Creá tu gimnasio y cargá las máquinas que tiene. Claude arma las rutinas sólo con eso. Si te cambiás de gimnasio, creás otro y lo elegís como activo.</p>
       <label>Nombre</label><input id="gymName" placeholder="Ej: Gym del barrio"><button class="primary block mt" data-action="create-gym">Crear</button></section>`;
   } else {
-    const byKind = {};
-    g?.equipment.forEach(e => (byKind[e.kind] ||= []).push(e));
     html += `<section class="card"><h2>Gimnasio activo</h2>
       <select data-field="gym.active">${state.gyms.map(x => `<option value="${x.id}" ${x.id === state.activeGymId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
       <div class="row mt"><button class="sm" data-action="new-gym">+ Otro gimnasio</button><button class="sm" data-action="rename-gym">Renombrar</button><button class="sm danger" data-action="delete-gym">Borrar</button></div></section>
-      <section class="card"><div class="row between"><h2>Equipamiento (${g?.equipment.length || 0})</h2></div>
-      ${Object.keys(byKind).length ? Object.entries(byKind).map(([k, items]) => `<h4>${esc(k)}</h4><ul class="list">${items.map(e => `<li>
-          <div>${esc(e.name)}<br><small class="muted">${e.increment ? `escalón ${e.increment} kg` : 'sin escalón'}${e.notes ? ` · ${esc(e.notes)}` : ''}</small></div>
-          <button class="sm ghost" data-action="edit-equip" data-id="${e.id}">Editar</button></li>`).join('')}</ul>`).join('')
-        : '<p class="muted small">Sin equipamiento cargado.</p>'}
-      <div class="row mt"><button class="primary" data-action="add-equip">+ Agregar</button><button data-action="bulk-equip">Carga rápida</button></div></section>`;
+      <section class="card"><div class="row between"><h2>Máquinas (${g?.equipment.length || 0})</h2></div>
+      ${g?.equipment.length ? `<ul class="list">${g.equipment.map(e => `<li class="tap" data-action="edit-equip" data-id="${e.id}">
+          ${thumb(machineById(e.cat)?.ex[0])}
+          <div class="grow">${esc(e.name)}<br><small class="muted">${incText(e)}${e.notes ? ` · ${esc(e.notes)}` : ''}</small></div>
+          <span class="chev">›</span></li>`).join('')}</ul>`
+        : '<p class="muted small">Tocá "Elegir máquinas" y marcá las que hay en tu gimnasio. El peso mínimo de cada una lo cargás después, la primera vez que la uses.</p>'}
+      <button class="primary block mt" data-action="pick-machines">Elegir máquinas</button></section>`;
   }
 
   const races = [...state.races].sort((a, b) => a.date.localeCompare(b.date));
@@ -266,7 +293,10 @@ function viewGym() {
   <section class="card"><h2>Respaldo</h2><p class="muted small">Los datos viven sólo en este teléfono. Exportá un respaldo cada tanto (a Archivos o iCloud Drive).
     ${state.lastExport ? `Último: ${fmtDate(localDate(state.lastExport))}.` : 'Todavía no exportaste ninguno.'}</p>
     <div class="row"><button data-action="export">Exportar</button><button data-action="import">Importar</button></div>
-    <input type="file" id="importFile" accept="application/json,.json" hidden></section>`;
+    <input type="file" id="importFile" accept="application/json,.json" hidden></section>
+  <section class="card"><h2>Créditos</h2><p class="muted small">
+    Dibujos y datos de los ejercicios: <a href="https://repdb.co" rel="nofollow" target="_blank">Exercise data by RepDB (repdb.co)</a>.<br>
+    Mapa de músculos: <a href="https://github.com/HichamELBSI/react-native-body-highlighter" target="_blank">react-native-body-highlighter</a> (licencia MIT, © 2022 ELABBASSI Hicham).</p></section>`;
   return html;
 }
 
@@ -509,15 +539,98 @@ function readDraft() {
 
 // ---------- formularios en la hoja ----------
 
-function equipForm(e = null) {
-  const kind = e?.kind || 'máquina';
-  openSheet(`<h2>${e ? 'Editar' : 'Agregar'} equipo</h2>
-    <label>Nombre</label><input id="eqName" value="${esc(e?.name)}" placeholder="Ej: Prensa 45°">
-    <label>Tipo</label><select id="eqKind">${Object.keys(KINDS).map(k => `<option ${k === kind ? 'selected' : ''}>${k}</option>`).join('')}</select>
-    <label>Escalón mínimo de peso (kg)</label><input id="eqInc" inputmode="decimal" value="${e?.increment ?? KINDS[kind]}">
-    <label>Notas</label><input id="eqNotes" value="${esc(e?.notes)}" placeholder="Ej: máx 100 kg, polea doble">
-    <div class="row between mt">${e ? `<button class="danger" data-action="delete-equip" data-id="${e.id}">Borrar</button>` : '<span></span>'}
-      <div class="btns"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="save-equip" data-id="${e?.id || ''}">Guardar</button></div></div>`);
+// ---------- máquinas y ejercicios (catálogo de RepDB) ----------
+
+// Dibujo chico del ejercicio; vacío si no está en el catálogo.
+const thumb = (id, cls = 'thumb') => id && EXERCISES[id]
+  ? `<img class="${cls}" src="${imgUrl(id)}" alt="" loading="lazy" crossorigin="anonymous">`
+  : `<span class="${cls} none"></span>`;
+
+function incText(e) {
+  if (KINDS[e.kind] === 0 && e.increment == null) return esc(e.kind);
+  return e.increment == null ? 'peso mínimo: se pregunta al usarla' : `sube de a ${e.increment} kg`;
+}
+
+// Selector: grilla de máquinas del grupo elegido; tocar una la agrega o la quita del
+// gimnasio activo al instante (no hay "guardar").
+function machinePicker() {
+  const have = new Set(activeGym().equipment.map(e => e.cat).filter(Boolean));
+  const list = MACHINES.filter(m => m.group === ui.group);
+  openSheet(`<h2>Tu gimnasio</h2><p class="muted small">Tocá las máquinas que hay. La ⓘ muestra qué ejercicios se hacen en cada una.</p>
+    <div class="chips scroll">${GROUPS.map(g => `<button class="chip ${g === ui.group ? 'on' : ''}" data-action="pick-group" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
+    <div class="mgrid">${list.map(m => `<div class="mtile ${have.has(m.id) ? 'sel' : ''}" data-action="toggle-machine" data-id="${m.id}">
+      ${thumb(m.ex[0], 'mimg')}<span class="ck">${have.has(m.id) ? '✓' : ''}</span>
+      <button class="info" data-action="machine-info" data-id="${m.id}" aria-label="Ejercicios de ${esc(m.name)}">i</button>
+      <div class="mname">${esc(m.name)}</div></div>`).join('')}</div>
+    <button class="ghost block mt" data-action="add-custom-equip">+ Otra que no está en la lista</button>
+    <button class="primary block" data-action="close-sheet">Listo · ${activeGym().equipment.length} máquinas</button>`);
+}
+
+function machineInfo(m) {
+  openSheet(`<h2>${esc(m.name)}</h2><p class="muted small">${m.ex.length} ejercicio${m.ex.length > 1 ? 's' : ''} · tocá uno para ver cómo se hace</p>
+    <ul class="list">${m.ex.map(id => `<li class="tap" data-action="exercise-info" data-id="${id}" data-back="machine:${m.id}">${thumb(id)}
+      <div class="grow">${esc(EXERCISES[id].n)}<br><small class="muted">${esc(muscleText(EXERCISES[id].p))}</small></div><span class="chev">›</span></li>`).join('')}</ul>
+    <button class="block mt" data-action="pick-machines">← Volver</button>`);
+}
+
+// Lista para "Agregar ejercicio": los que ya hiciste primero, después los de las máquinas
+// de tu gimnasio. Filtra por nombre o músculo mientras escribís.
+function exercisePickList() {
+  const q = norm(ui.exSearch).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const match = s => norm(s).normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q);
+  const rows = [];
+  for (const n of knownExerciseNames()) {
+    const id = exerciseIdByName(n);
+    const m = id ? muscleText(EXERCISES[id].p) : '';
+    if (!q || match(n) || match(m)) rows.push({ id, n, m });
+  }
+  rows.sort((a, b) => (lastPerformance(b.n) ? 1 : 0) - (lastPerformance(a.n) ? 1 : 0));
+  return rows.slice(0, 60).map(r => `<li class="tap" data-action="add-exercise-ok" data-name="${esc(r.n)}">${thumb(r.id)}
+    <div class="grow">${esc(r.n)}${r.m ? `<br><small class="muted">${esc(r.m)}</small>` : ''}</div><span class="chev">+</span></li>`).join('')
+    || '<li class="muted small">Nada con ese nombre: tocá "Agregar lo escrito".</li>';
+}
+
+const muscleText = list => [...new Set(list.map(m => MUSCLE_ES[m] || m))].join(', ');
+
+// Ficha del ejercicio: dibujo que alterna inicio/final, cuerpo con los músculos y pasos.
+let poseTimer;
+function exerciseInfo(id, back = '') {
+  const e = EXERCISES[id];
+  const chips = [...new Set(e.p.map(m => MUSCLE_ES[m]))].map(m => `<span class="chip p">${esc(m)}</span>`).join('')
+    + [...new Set(e.s.map(m => MUSCLE_ES[m]))].filter(m => !e.p.some(p => MUSCLE_ES[p] === m)).map(m => `<span class="chip s">${esc(m)}</span>`).join('');
+  openSheet(`<h2>${esc(e.n)}</h2>
+    <div class="hero"><img id="pose" crossorigin="anonymous" src="${imgUrl(id, 'start')}" alt="${esc(e.n)}">${e.one ? '' : '<span class="tag">inicio → final</span>'}</div>
+    ${bodySvg(e.p, e.s)}
+    <div class="chips">${chips}</div>
+    ${e.steps.length ? `<h4>Cómo se hace</h4><ol class="small steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
+    ${e.tips.length ? `<h4>Ojo con</h4><ul class="small plain">${e.tips.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+    ${back.startsWith('machine:') ? `<button class="block mt" data-action="machine-info" data-id="${back.slice(8)}">← Volver</button>` : '<button class="block mt" data-action="close-sheet">Cerrar</button>'}`);
+  // Alterna las dos poses como una animación de dos cuadros, mientras la ficha esté abierta.
+  clearInterval(poseTimer);
+  if (!e.one) {
+    let peak = false;
+    poseTimer = setInterval(() => {
+      const img = $('#pose');
+      if (!img || $('#sheet').hidden) return clearInterval(poseTimer);
+      peak = !peak;
+      img.src = imgUrl(id, peak ? 'peak' : 'start');
+    }, 1200);
+  }
+}
+
+function equipForm(e) {
+  const m = machineById(e.cat);
+  const custom = !m;
+  openSheet(`<h2>${esc(e.name)}</h2>
+    ${m ? `<div class="row">${thumb(m.ex[0])}<button class="sm ghost" data-action="machine-info" data-id="${m.id}">Ver ejercicios</button></div>` : ''}
+    ${custom ? `<label>Nombre</label><input id="eqName" value="${esc(e.name)}">
+      <label>Tipo</label><select id="eqKind">${Object.keys(KINDS).map(k => `<option ${k === e.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>` : ''}
+    <label>¿De a cuánto sube el peso? (kg)</label>
+    <div class="chips">${INC_CHOICES.map(v => `<button class="chip ${e.increment === v ? 'on' : ''}" data-action="eq-inc-pick" data-v="${v}">${String(v).replace('.', ',')}</button>`).join('')}</div>
+    <input id="eqInc" inputmode="decimal" value="${e.increment ?? ''}" placeholder="sin cargar: se pregunta al usarla">
+    <label>Notas</label><input id="eqNotes" value="${esc(e.notes)}" placeholder="Ej: máx 100 kg, polea doble">
+    <div class="row between mt"><button class="danger" data-action="delete-equip" data-id="${e.id}">Quitar</button>
+      <div class="btns"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="save-equip" data-id="${e.id}">Guardar</button></div></div>`);
 }
 
 function raceForm(r = null) {
@@ -610,11 +723,15 @@ const ACTIONS = {
   discard: () => { if (confirm('¿Descartar este entrenamiento? No se guarda nada.')) { state.active = null; save(); render(); } },
   finish: finishSession,
 
-  'add-exercise': () => openSheet(`<h2>Agregar ejercicio</h2>
-    <input id="newEx" list="exnames" placeholder="Nombre del ejercicio o máquina" autocomplete="off">${datalist()}
-    <div class="row mt"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="add-exercise-ok">Agregar</button></div>`),
-  'add-exercise-ok': () => {
-    const name = $('#newEx').value.trim();
+  'add-exercise': () => {
+    ui.exSearch = '';
+    openSheet(`<h2>Agregar ejercicio</h2>
+      <input id="newEx" data-field="ui.exSearch" placeholder="Buscar o escribir un nombre" autocomplete="off">
+      <ul class="list" id="exPick">${exercisePickList()}</ul>
+      <div class="row mt"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="add-exercise-ok">Agregar lo escrito</button></div>`);
+  },
+  'add-exercise-ok': d => {
+    const name = d.name || $('#newEx').value.trim();
     if (!name) return;
     state.active.exercises.push(newExercise(name));
     save(); closeSheet(); render();
@@ -711,30 +828,51 @@ const ACTIONS = {
     state.activeGymId = state.gyms[0]?.id || null;
     save(); render();
   },
-  'add-equip': () => equipForm(),
+  'pick-machines': () => machinePicker(),
+  'pick-group': d => { ui.group = d.g; machinePicker(); },
+  'toggle-machine': d => {
+    const g = activeGym();
+    const i = g.equipment.findIndex(e => e.cat === d.id);
+    if (i >= 0) g.equipment.splice(i, 1);
+    else {
+      const m = machineById(d.id);
+      g.equipment.push({ id: uid(), cat: m.id, name: m.name, kind: m.kind, increment: null, notes: '' });
+    }
+    save(); machinePicker(); render();
+  },
+  'machine-info': d => machineInfo(machineById(d.id)),
+  'exercise-info': d => exerciseInfo(d.id, d.back || ''),
+  'add-custom-equip': () => {
+    const name = prompt('Nombre de la máquina o equipo');
+    if (!name?.trim()) return;
+    const e = { id: uid(), name: name.trim(), kind: 'máquina', increment: null, notes: '' };
+    activeGym().equipment.push(e);
+    save(); render(); equipForm(e);
+  },
   'edit-equip': d => equipForm(activeGym().equipment.find(e => e.id === d.id)),
+  'eq-inc-pick': (d, el) => {
+    $('#eqInc').value = d.v;
+    el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === el));
+  },
   'save-equip': d => {
-    const name = $('#eqName').value.trim();
-    if (!name) return alert('Ponele un nombre al equipo.');
-    const data = { name, kind: $('#eqKind').value, increment: num($('#eqInc').value) ?? 0, notes: $('#eqNotes').value.trim() };
-    const list = activeGym().equipment;
-    const ex = list.find(e => e.id === d.id);
-    if (ex) Object.assign(ex, data); else list.push({ id: uid(), ...data });
+    const e = activeGym().equipment.find(x => x.id === d.id);
+    if ($('#eqName')) {
+      const name = $('#eqName').value.trim();
+      if (!name) return alert('Ponele un nombre a la máquina.');
+      Object.assign(e, { name, kind: $('#eqKind').value });
+    }
+    Object.assign(e, { increment: num($('#eqInc').value), notes: $('#eqNotes').value.trim() });
     save(); closeSheet(); render();
   },
   'delete-equip': d => { const g = activeGym(); g.equipment = g.equipment.filter(e => e.id !== d.id); save(); closeSheet(); render(); },
-  'bulk-equip': () => openSheet(`<h2>Carga rápida</h2>
-    <p class="muted small">Uno por línea. Opcional, separado por ";": tipo y escalón en kg.<br>Tipos: ${Object.keys(KINDS).join(', ')}.</p>
-    <textarea id="bulkEq" placeholder="Prensa 45°; máquina; 5&#10;Polea alta; polea&#10;Mancuernas; peso libre; 2&#10;Banco plano"></textarea>
-    <div class="row mt"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="bulk-equip-ok">Agregar</button></div>`),
-  'bulk-equip-ok': () => {
-    const lines = $('#bulkEq').value.split('\n').map(l => l.trim()).filter(Boolean);
-    for (const l of lines) {
-      const [name, kindRaw, inc] = l.split(';').map(x => x.trim());
-      const kind = KINDS[norm(kindRaw)] !== undefined ? norm(kindRaw) : 'máquina';
-      activeGym().equipment.push({ id: uid(), name, kind, increment: num(inc) ?? KINDS[kind], notes: '' });
-    }
-    save(); closeSheet(); render(); toast(`${lines.length} equipos agregados`);
+  // Escalón cargado desde la tarjeta del ejercicio, la primera vez que usás la máquina.
+  'set-inc': d => {
+    const e = activeGym().equipment.find(x => x.id === d.id);
+    let v = num(d.v);
+    if (d.v === 'otro') v = num(prompt(`¿De a cuántos kg sube ${e.name}?`, ''));
+    if (v == null) return;
+    e.increment = v;
+    save(); render(); toast(`${e.name}: sube de a ${v} kg`);
   },
 
   'add-race': () => raceForm(),
@@ -918,7 +1056,9 @@ function onField(e) {
     state[key] = el.type === 'checkbox' ? el.checked : v;
     save(); render(); return;
   } else if (scope === 'ui') {
-    ui[key] = v; return;
+    ui[key] = v;
+    if (key === 'exSearch') $('#exPick').innerHTML = exercisePickList();
+    return;
   }
   save();
 }

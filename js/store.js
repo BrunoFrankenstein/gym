@@ -23,7 +23,9 @@ export const DEFAULT = () => ({
     runNotes: '',        // km semanales actuales, marcas, experiencia corriendo
   },
   races: [],         // carreras objetivo: [{ id, name, date, distanceKm, goalTime, priority: 'A'|'B'|'C', notes }]
-  gyms: [],          // [{ id, name, equipment: [{ id, name, kind, increment, notes }] }]
+  gyms: [],          // [{ id, name, equipment: [{ id, cat, name, kind, increment, notes }] }]
+                     // cat = id de la máquina en catalog.js (vacío si la agregaste a mano);
+                     // increment = null hasta que cargues el escalón al usarla.
   activeGymId: null,
   templates: [],     // planillas: [{ id, name, source: 'manual'|'claude', exercises: [target] }]
   plan: null,        // plan semanal de Claude (ver claude.js → applyPlan)

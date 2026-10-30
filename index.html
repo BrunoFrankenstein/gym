@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Gym">
-  <meta name="theme-color" content="#0f1012">
+  <meta name="theme-color" content="#0a0a0a">
   <!-- Fondo oscuro antes de que llegue styles.css: evita el destello blanco al abrir. -->
-  <style>html, body { background: #0f1012; color: #f1f2f4; }</style>
+  <style>html, body { background: #0a0a0a; color: #fafafa; }</style>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" href="icons/icon-192.png">
@@ -28,6 +28,10 @@
   <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1206x2622.png">
   <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1320x2868.png">
   <link rel="apple-touch-startup-image" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/splash-1260x2736.png">
+  <!-- Inter (la tipografía de skulpt). Si no carga, cae a la del sistema (San Francisco). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="styles.css">
   <!-- Pide todos los módulos a la vez; si no, el navegador descubre los imports de app.js
        recién después de bajarlo y los pide en una segunda tanda. -->
@@ -39,6 +43,9 @@
   <link rel="modulepreload" href="js/strava.js">
   <link rel="modulepreload" href="js/watch.js">
   <link rel="modulepreload" href="js/project.js">
+  <link rel="modulepreload" href="js/exercises.js">
+  <link rel="modulepreload" href="js/catalog.js">
+  <link rel="modulepreload" href="js/body.js">
   <title>Gym</title>
 </head>
 <body>
