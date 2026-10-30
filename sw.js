@@ -1,9 +1,11 @@
 // Service worker: guarda la app en el teléfono para que abra al instante y sin internet.
 // Estrategia "stale-while-revalidate": responde con lo guardado y en paralelo baja la
-// versión nueva. Consecuencia: cuando publicás un cambio, aparece en la SEGUNDA apertura.
-// Subí CACHE (gym-v2, v3…) si cambiás la lista de archivos.
+// versión nueva. Cuando cambia este archivo, el service worker nuevo baja todo de nuevo y
+// la app se recarga sola (ver "controllerchange" en app.js).
+// Subí CACHE (gym-v10, v11…) en CADA publicación que cambie archivos de la app: es lo que
+// hace que el teléfono note que hay versión nueva.
 
-const CACHE = 'gym-v9';
+const CACHE = 'gym-v10';
 // Dibujos de RepDB y la fuente Inter vienen de otros sitios: van en una caché aparte que no
 // se borra al publicar una versión nueva (no cambian, y así no se vuelven a bajar).
 const MEDIA = 'gym-media';
@@ -15,7 +17,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' saltea la caché HTTP del navegador. Sin esto, GitHub Pages (que permite
+  // guardar 10 minutos) podía entregar archivos viejos y quedaba una mezcla de versiones.
+  e.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -50,7 +56,8 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.open(CACHE).then(async cache => {
       const cached = await cache.match(e.request, { ignoreSearch: true });
-      const fresh = fetch(e.request)
+      // no-cache: pregunta al servidor si cambió (en vez de usar la copia HTTP de 10 min).
+      const fresh = fetch(e.request, { cache: 'no-cache' })
         .then(res => { if (res.ok) cache.put(e.request, res.clone()); return res; })
         .catch(() => cached);
       return cached || fresh;

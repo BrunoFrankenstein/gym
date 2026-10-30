@@ -31,6 +31,10 @@ const ui = {
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
+// Se muestra al pie de Gimnasio para saber si el teléfono ya tiene lo último publicado.
+// Va con el mismo número que CACHE en sw.js.
+const VERSION = 'v10';
+
 const TITLES = { entrenar: 'Entrenar', historial: 'Historial', rutinas: 'Planillas', gym: 'Gimnasio y perfil', claude: 'Claude' };
 
 // Escalón de peso por defecto según el tipo de equipo, mientras no cargues el real.
@@ -296,7 +300,8 @@ function viewGym() {
     <input type="file" id="importFile" accept="application/json,.json" hidden></section>
   <section class="card"><h2>Créditos</h2><p class="muted small">
     Dibujos y datos de los ejercicios: <a href="https://repdb.co" rel="nofollow" target="_blank">Exercise data by RepDB (repdb.co)</a>.<br>
-    Mapa de músculos: <a href="https://github.com/HichamELBSI/react-native-body-highlighter" target="_blank">react-native-body-highlighter</a> (licencia MIT, © 2022 ELABBASSI Hicham).</p></section>`;
+    Mapa de músculos: <a href="https://github.com/HichamELBSI/react-native-body-highlighter" target="_blank">react-native-body-highlighter</a> (licencia MIT, © 2022 ELABBASSI Hicham).</p>
+    <p class="muted small">Versión de la app: ${VERSION}</p></section>`;
   return html;
 }
 
@@ -1069,7 +1074,14 @@ document.addEventListener('change', e => { if (e.target.id === 'importFile' && e
 // Service worker (modo sin internet). No se registra en localhost para que, mientras
 // desarrollás, cada recarga muestre los cambios sin pelearse con la caché.
 if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(location.hostname)) {
-  navigator.serviceWorker.register('sw.js');
+  // Si ya había un service worker y lo reemplaza uno nuevo (versión publicada), se recarga
+  // una vez para mostrar la versión nueva sin tener que cerrar y abrir la app.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
 }
 navigator.storage?.persist?.();
 
