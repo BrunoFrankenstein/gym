@@ -5,7 +5,7 @@
 // Subí CACHE (gym-v10, v11…) en CADA publicación que cambie archivos de la app: es lo que
 // hace que el teléfono note que hay versión nueva.
 
-const CACHE = 'gym-v10';
+const CACHE = 'gym-v11';
 // Dibujos de RepDB y la fuente Inter vienen de otros sitios: van en una caché aparte que no
 // se borra al publicar una versión nueva (no cambian, y así no se vuelven a bajar).
 const MEDIA = 'gym-media';

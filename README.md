@@ -49,16 +49,16 @@ versión nueva en segundo plano). Si cambiás la lista de archivos, subí `CACHE
 | `js/progression.js` | Regla local de sobrecarga progresiva |
 | `js/claude.js` | Armado del pedido y lectura de la respuesta JSON |
 | `js/running.js` | Tiempos, ritmos, cuenta regresiva |
-| `js/catalog.js` | Máquinas y ejercicios (generado desde RepDB, no editar a mano) |
-| `js/exercises.js` | Búsqueda en el catálogo, URL de los dibujos y mapa de músculos |
+| `js/catalog.js` | Máquinas que se pueden elegir y qué equipos de RepDB agrupa cada una |
+| `js/exercises.js` | Baja el catálogo de RepDB, búsqueda, URL de los dibujos y mapa de músculos |
 | `js/body.js` | Siluetas SVG del cuerpo |
 | `sw.js` | Caché para modo sin internet |
 
 ## Créditos
 
 - **Exercise data by [RepDB (repdb.co)](https://repdb.co)** — nombres, músculos, pasos y dibujos
-  de los ejercicios (licencia RepDB Free Tier v1.0). Las imágenes no están en este repositorio:
-  la app las carga de exercise-dataset.com y el service worker las guarda en el teléfono.
+  de los ejercicios (licencia RepDB Free Tier v1.0). Ni los datos ni las imágenes están en este
+  repositorio: la app los baja de exercise-dataset.com y el service worker los guarda en el teléfono.
 - **[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)**
   — siluetas del cuerpo para el mapa de músculos (MIT, © 2022 ELABBASSI Hicham).
 - La estética está inspirada en [skulpt](https://github.com/skulptapp/skulpt); no se usó su código.

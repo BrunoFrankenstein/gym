@@ -11,7 +11,7 @@ import { RUN_TYPES, parseDuration, fmtDuration, fmtPace, daysUntil } from './run
 import * as strava from './strava.js';
 import { recipeHtml, hasSteps, buildSteps } from './watch.js';
 import { PROJECT_INSTRUCTIONS } from './project.js';
-import { MACHINES, EXERCISES, imgUrl, exerciseIdByName, machineById, machineOfExercise, exercisesForGym, MUSCLE_ES, bodySvg } from './exercises.js';
+import { MACHINES, EXERCISES, PARTS, loadCatalog, catalogReady, imgUrl, exerciseIdByName, machineById, machineOfExercise, exercisesForGym, MUSCLE_ES, bodySvg } from './exercises.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,13 +27,15 @@ const ui = {
   draft: null,  // planilla en edición
   group: 'Piernas', // grupo abierto en el selector de máquinas
   exSearch: '',     // filtro del buscador de ejercicios
+  exGroup: null,    // grupo muscular abierto al agregar ejercicio
+  exAll: false,     // mostrar también ejercicios para máquinas que tu gimnasio no tiene
 };
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
 // Se muestra al pie de Gimnasio para saber si el teléfono ya tiene lo último publicado.
 // Va con el mismo número que CACHE en sw.js.
-const VERSION = 'v10';
+const VERSION = 'v11';
 
 const TITLES = { entrenar: 'Entrenar', historial: 'Historial', rutinas: 'Planillas', gym: 'Gimnasio y perfil', claude: 'Claude' };
 
@@ -87,10 +89,10 @@ function suggestionFor(ex) {
 
 const claudeAdvice = name => state.plan?.progression?.find(p => norm(p.exercise) === norm(name))?.advice;
 
-function knownExerciseNames() {
+function knownExerciseNames(withGym = true) {
   const names = new Map();
   const add = n => { if (n && !names.has(norm(n))) names.set(norm(n), n); };
-  exercisesForGym(activeGym()).forEach(id => add(EXERCISES[id].n));
+  if (withGym) exercisesForGym(activeGym()).forEach(id => add(EXERCISES[id].n));
   state.templates.forEach(t => t.exercises.forEach(e => add(e.name)));
   state.plan?.days.forEach(d => d.exercises.forEach(e => add(e.name)));
   state.sessions.forEach(s => s.exercises.forEach(e => add(e.name)));
@@ -256,7 +258,7 @@ function viewGym() {
       <div class="row mt"><button class="sm" data-action="new-gym">+ Otro gimnasio</button><button class="sm" data-action="rename-gym">Renombrar</button><button class="sm danger" data-action="delete-gym">Borrar</button></div></section>
       <section class="card"><div class="row between"><h2>Máquinas (${g?.equipment.length || 0})</h2></div>
       ${g?.equipment.length ? `<ul class="list">${g.equipment.map(e => `<li class="tap" data-action="edit-equip" data-id="${e.id}">
-          ${thumb(machineById(e.cat)?.ex[0])}
+          ${thumb(machineById(e.cat)?.cover)}
           <div class="grow">${esc(e.name)}<br><small class="muted">${incText(e)}${e.notes ? ` · ${esc(e.notes)}` : ''}</small></div>
           <span class="chev">›</span></li>`).join('')}</ul>`
         : '<p class="muted small">Tocá "Elegir máquinas" y marcá las que hay en tu gimnasio. El peso mínimo de cada una lo cargás después, la primera vez que la uses.</p>'}
@@ -547,7 +549,7 @@ function readDraft() {
 // ---------- máquinas y ejercicios (catálogo de RepDB) ----------
 
 // Dibujo chico del ejercicio; vacío si no está en el catálogo.
-const thumb = (id, cls = 'thumb') => id && EXERCISES[id]
+const thumb = (id, cls = 'thumb') => id
   ? `<img class="${cls}" src="${imgUrl(id)}" alt="" loading="lazy" crossorigin="anonymous">`
   : `<span class="${cls} none"></span>`;
 
@@ -562,9 +564,9 @@ function machinePicker() {
   const have = new Set(activeGym().equipment.map(e => e.cat).filter(Boolean));
   const list = MACHINES.filter(m => m.group === ui.group);
   openSheet(`<h2>Tu gimnasio</h2><p class="muted small">Tocá las máquinas que hay. La ⓘ muestra qué ejercicios se hacen en cada una.</p>
-    <div class="chips scroll">${GROUPS.map(g => `<button class="chip ${g === ui.group ? 'on' : ''}" data-action="pick-group" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
+    <div class="chips">${GROUPS.map(g => `<button class="chip ${g === ui.group ? 'on' : ''}" data-action="pick-group" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
     <div class="mgrid">${list.map(m => `<div class="mtile ${have.has(m.id) ? 'sel' : ''}" data-action="toggle-machine" data-id="${m.id}">
-      ${thumb(m.ex[0], 'mimg')}<span class="ck">${have.has(m.id) ? '✓' : ''}</span>
+      ${thumb(m.cover, 'mimg')}<span class="ck">${have.has(m.id) ? '✓' : ''}</span>
       <button class="info" data-action="machine-info" data-id="${m.id}" aria-label="Ejercicios de ${esc(m.name)}">i</button>
       <div class="mname">${esc(m.name)}</div></div>`).join('')}</div>
     <button class="ghost block mt" data-action="add-custom-equip">+ Otra que no está en la lista</button>
@@ -578,21 +580,42 @@ function machineInfo(m) {
     <button class="block mt" data-action="pick-machines">← Volver</button>`);
 }
 
-// Lista para "Agregar ejercicio": los que ya hiciste primero, después los de las máquinas
-// de tu gimnasio. Filtra por nombre o músculo mientras escribís.
+// Lista para "Agregar ejercicio", por grupo muscular. "Tus ejercicios" son los de tu
+// historial, planillas y plan. Por defecto sólo aparece lo que se puede hacer con las
+// máquinas de tu gimnasio (más peso corporal); "ver todos" muestra los 701 de RepDB.
+// Al escribir, busca por nombre o músculo en todos los grupos.
+const MINE = 'Tus ejercicios';
 function exercisePickList() {
-  const q = norm(ui.exSearch).normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const match = s => norm(s).normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q);
-  const rows = [];
-  for (const n of knownExerciseNames()) {
-    const id = exerciseIdByName(n);
-    const m = id ? muscleText(EXERCISES[id].p) : '';
-    if (!q || match(n) || match(m)) rows.push({ id, n, m });
+  const fold = s => norm(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const q = fold(ui.exSearch);
+  const pool = ui.exAll ? Object.keys(EXERCISES) : exercisesForGym(activeGym());
+  let rows;
+  if (ui.exGroup === MINE && !q) {
+    rows = knownExerciseNames(false).map(n => ({ id: exerciseIdByName(n), n }));
+  } else {
+    const ids = pool.filter(id => q
+      ? fold(EXERCISES[id].n).includes(q) || fold(muscleText(EXERCISES[id].p)).includes(q)
+      : EXERCISES[id].part === ui.exGroup);
+    ids.sort((a, b) => EXERCISES[a].rank - EXERCISES[b].rank || EXERCISES[a].n.localeCompare(EXERCISES[b].n, 'es'));
+    rows = ids.map(id => ({ id, n: EXERCISES[id].n }));
+    // Los tuyos que no están en el catálogo (nombres propios) también se encuentran buscando.
+    if (q) knownExerciseNames(false).filter(n => !exerciseIdByName(n) && fold(n).includes(q)).forEach(n => rows.unshift({ id: null, n }));
   }
-  rows.sort((a, b) => (lastPerformance(b.n) ? 1 : 0) - (lastPerformance(a.n) ? 1 : 0));
-  return rows.slice(0, 60).map(r => `<li class="tap" data-action="add-exercise-ok" data-name="${esc(r.n)}">${thumb(r.id)}
-    <div class="grow">${esc(r.n)}${r.m ? `<br><small class="muted">${esc(r.m)}</small>` : ''}</div><span class="chev">+</span></li>`).join('')
-    || '<li class="muted small">Nada con ese nombre: tocá "Agregar lo escrito".</li>';
+  const empty = !catalogReady()
+    ? 'Cargando ejercicios… (la primera vez necesita internet)'
+    : q ? 'Nada con ese nombre: tocá "Agregar lo escrito".'
+    : ui.exGroup === MINE ? 'Todavía no hiciste ejercicios. Elegí un grupo muscular arriba.'
+    : 'Nada de este grupo con las máquinas de tu gimnasio. Tocá "Ver todos" o elegí más máquinas en Gimnasio.';
+  return rows.map(r => `<li class="tap" data-action="add-exercise-ok" data-name="${esc(r.n)}">${thumb(r.id)}
+    <div class="grow">${esc(r.n)}${r.id ? `<br><small class="muted">${esc(muscleText(EXERCISES[r.id].p))}</small>` : ''}</div><span class="chev">+</span></li>`).join('')
+    || `<li class="muted small">${empty}</li>`;
+}
+
+function renderExercisePicker() {
+  const groups = [MINE, ...PARTS];
+  $('#exGroups').innerHTML = groups.map(g => `<button class="chip ${g === ui.exGroup ? 'on' : ''}" data-action="ex-group" data-g="${esc(g)}">${esc(g)}</button>`).join('');
+  $('#exAll').textContent = ui.exAll ? 'Sólo lo de mi gimnasio' : 'Ver todos los ejercicios';
+  $('#exPick').innerHTML = exercisePickList();
 }
 
 const muscleText = list => [...new Set(list.map(m => MUSCLE_ES[m] || m))].join(', ');
@@ -627,7 +650,7 @@ function equipForm(e) {
   const m = machineById(e.cat);
   const custom = !m;
   openSheet(`<h2>${esc(e.name)}</h2>
-    ${m ? `<div class="row">${thumb(m.ex[0])}<button class="sm ghost" data-action="machine-info" data-id="${m.id}">Ver ejercicios</button></div>` : ''}
+    ${m ? `<div class="row">${thumb(m.cover)}<button class="sm ghost" data-action="machine-info" data-id="${m.id}">Ver ejercicios</button></div>` : ''}
     ${custom ? `<label>Nombre</label><input id="eqName" value="${esc(e.name)}">
       <label>Tipo</label><select id="eqKind">${Object.keys(KINDS).map(k => `<option ${k === e.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>` : ''}
     <label>¿De a cuánto sube el peso? (kg)</label>
@@ -730,11 +753,18 @@ const ACTIONS = {
 
   'add-exercise': () => {
     ui.exSearch = '';
+    if (!ui.exGroup) ui.exGroup = knownExerciseNames(false).length ? MINE : 'Piernas';
     openSheet(`<h2>Agregar ejercicio</h2>
-      <input id="newEx" data-field="ui.exSearch" placeholder="Buscar o escribir un nombre" autocomplete="off">
-      <ul class="list" id="exPick">${exercisePickList()}</ul>
-      <div class="row mt"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="add-exercise-ok">Agregar lo escrito</button></div>`);
+      <input id="newEx" data-field="ui.exSearch" placeholder="Buscar por nombre o músculo" autocomplete="off">
+      <div class="chips" id="exGroups"></div>
+      <ul class="list" id="exPick"></ul>
+      <button class="sm ghost block mt" id="exAll" data-action="ex-all"></button>
+      <div class="row"><button data-action="close-sheet">Cancelar</button><button class="primary" data-action="add-exercise-ok">Agregar lo escrito</button></div>`);
+    renderExercisePicker();
+    if (!catalogReady()) loadCatalog().then(() => { if ($('#exPick')) renderExercisePicker(); }).catch(() => {});
   },
+  'ex-group': d => { ui.exGroup = d.g; ui.exSearch = ''; $('#newEx').value = ''; renderExercisePicker(); },
+  'ex-all': () => { ui.exAll = !ui.exAll; renderExercisePicker(); },
   'add-exercise-ok': d => {
     const name = d.name || $('#newEx').value.trim();
     if (!name) return;
@@ -845,7 +875,10 @@ const ACTIONS = {
     }
     save(); machinePicker(); render();
   },
-  'machine-info': d => machineInfo(machineById(d.id)),
+  'machine-info': async d => {
+    try { await loadCatalog(); } catch { return alert('No pude bajar los ejercicios. La primera vez necesita internet; probá de nuevo con señal.'); }
+    machineInfo(machineById(d.id));
+  },
   'exercise-info': d => exerciseInfo(d.id, d.back || ''),
   'add-custom-equip': () => {
     const name = prompt('Nombre de la máquina o equipo');
@@ -1086,6 +1119,9 @@ if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(locatio
 navigator.storage?.persist?.();
 
 render();
+// El catálogo de ejercicios llega después (de la caché o de internet): al tenerlo se
+// redibuja para mostrar dibujos y músculos. Sin internet la primera vez, la app anda igual.
+loadCatalog().then(render).catch(() => {});
 
 // Strava: si strava.html dejó un código (misma app/almacenamiento), se canjea; si ya está
 // conectado, se traen las carreras nuevas. Se repite al volver a la app (iOS la deja

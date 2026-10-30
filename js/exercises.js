@@ -1,30 +1,79 @@
-// Todo lo que une el catálogo (catalog.js) con la interfaz: buscar un ejercicio por nombre,
-// armar la URL de su dibujo y pintar el mapa de músculos.
+// Todo lo que une el catálogo de ejercicios con la interfaz: bajarlo, buscar un ejercicio
+// por nombre, armar la URL de su dibujo y pintar el mapa de músculos.
 
-import { MACHINES, BODYWEIGHT, EXERCISES } from './catalog.js';
+import { MACHINES } from './catalog.js';
 import { BODY } from './body.js';
 
-export { MACHINES, EXERCISES };
+export { MACHINES };
 
-// Los dibujos se piden a RepDB (no se pueden republicar en este repo; ver catalog.js).
-// El service worker los guarda después de la primera vez, así andan sin internet.
-const IMG = 'https://exercise-dataset.com/images/flat/';
-export const imgUrl = (id, pose = 'peak') => `${IMG}${id}-${EXERCISES[id]?.one ? 'main' : pose}.webp`;
+// Datos e ilustraciones de RepDB ("Exercise data by RepDB (repdb.co)", licencia Free Tier
+// v1.0). No se pueden republicar como dataset, así que no viven en este repositorio: se
+// bajan de su sitio la primera vez (~600 KB comprimido) y el service worker los guarda.
+const SRC = 'https://exercise-dataset.com/';
+export const imgUrl = (id, pose = 'peak') => `${SRC}images/flat/${id}-${EXERCISES[id]?.one ? 'main' : pose}.webp`;
+
+// id → { n: nombre, p: músculos principales, s: secundarios, steps, tips, one: sólo una
+// pose, part: grupo para la lista, eq: clave de equipo de RepDB }. Vacío hasta que carga.
+export const EXERCISES = {};
+const BY_NAME = new Map();
 
 // Comparar nombres sin mayúsculas, tildes ni espacios de más: Claude a veces escribe
 // "Prensa de piernas" y el catálogo dice "Prensa de Piernas".
 const key = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
-const BY_NAME = new Map(Object.entries(EXERCISES).map(([id, e]) => [key(e.n), id]));
 export const exerciseIdByName = name => BY_NAME.get(key(name)) || null;
 
-export const machineById = id => MACHINES.find(m => m.id === id) || null;
-export const machineOfExercise = id => MACHINES.find(m => m.ex.includes(id)) || null;
+// Grupos de la lista "Agregar ejercicio", a partir de body_part y category de RepDB.
+export const PARTS = ['Piernas', 'Espalda', 'Pecho', 'Hombros', 'Brazos', 'Core', 'Cuerpo completo', 'Cardio', 'Movilidad'];
+const PART = { upper_legs: 'Piernas', lower_legs: 'Piernas', back: 'Espalda', chest: 'Pecho', shoulders: 'Hombros',
+  upper_arms: 'Brazos', lower_arms: 'Brazos', core: 'Core', full_body: 'Cuerpo completo' };
+const partOf = x => x.category === 'stretching' ? 'Movilidad' : x.category === 'cardio' ? 'Cardio' : PART[x.body_part] || 'Cuerpo completo';
 
-// Ejercicios que se pueden hacer en un gimnasio: los de sus máquinas más los de peso corporal.
+let loading = null;
+export const catalogReady = () => Object.keys(EXERCISES).length > 0;
+
+// Baja el dataset (o lo toma de la caché del service worker) y arma los índices. Cada
+// máquina recibe su lista `ex`: los ejercicios cuyo equipo está en su `eq`, más sus `extra`.
+export function loadCatalog() {
+  loading ||= fetch(`${SRC}exercises.json`, { mode: 'cors' })
+    .then(r => { if (!r.ok) throw new Error(`respuesta ${r.status}`); return r.json(); })
+    .then(data => {
+      for (const x of data.exercises) {
+        const name = x.name_es.trim();
+        EXERCISES[x.id] = {
+          n: name[0].toUpperCase() + name.slice(1),
+          p: x.primary_muscles || [], s: x.secondary_muscles || [],
+          steps: x.instructions_es || [], tips: (x.tips_es || []).slice(0, 2),
+          one: !x.images?.flat?.start, part: partOf(x), eq: x.equipment || null,
+          // Lo básico primero en las listas: fuerza antes que estiramientos, fácil antes que avanzado.
+          rank: (x.category === 'strength' ? 0 : 2) + (x.difficulty === 'advanced' ? 1 : 0),
+        };
+        BY_NAME.set(key(name), x.id);
+      }
+      const owner = {};
+      for (const m of MACHINES) {
+        m.ex = [...new Set([...(m.extra || []).filter(id => EXERCISES[id]),
+          ...Object.keys(EXERCISES).filter(id => m.eq.includes(EXERCISES[id].eq))])]
+          .sort((a, b) => EXERCISES[a].rank - EXERCISES[b].rank);
+        m.ex.forEach(id => (owner[id] ||= m));
+        m.cover ||= m.ex[0];
+      }
+      OWNER = owner;
+    })
+    .catch(e => { loading = null; throw e; });
+  return loading;
+}
+
+let OWNER = {};
+export const machineById = id => MACHINES.find(m => m.id === id) || null;
+// Primera máquina (en el orden de catalog.js) que tiene el ejercicio.
+export const machineOfExercise = id => OWNER[id] || null;
+
+// Ejercicios que se pueden hacer en un gimnasio: los de sus máquinas más los que no
+// necesitan equipo (peso corporal y estiramientos).
 export function exercisesForGym(gym) {
   const ids = new Set();
-  gym?.equipment.forEach(e => machineById(e.cat)?.ex.forEach(i => ids.add(i)));
-  BODYWEIGHT.forEach(i => ids.add(i));
+  gym?.equipment.forEach(e => machineById(e.cat)?.ex?.forEach(i => ids.add(i)));
+  for (const [id, x] of Object.entries(EXERCISES)) if (!x.eq) ids.add(id);
   return [...ids];
 }
 

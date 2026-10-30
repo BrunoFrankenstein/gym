@@ -119,7 +119,8 @@ Cuando recomiendes subir peso, reps, series o kilómetros, explicá en una líne
       gym.equipment.map(e => {
         const m = machineById(e.cat);
         return `- ${e.name} (${e.kind}${e.increment ? `, escalón ${e.increment} kg` : ''}${e.notes ? `, ${e.notes}` : ''})` +
-          (m ? ` — ejercicios: ${m.ex.map(id => EXERCISES[id].n).join('; ')}` : '');
+          // Hasta 20 por máquina (los más básicos primero) para que el pedido no sea enorme.
+          (m?.ex?.length ? ` — ejercicios: ${m.ex.slice(0, 20).map(id => EXERCISES[id].n).join('; ')}` : '');
       }).join('\n'));
   } else {
     out.push(`\n## Equipamiento\nTodavía no cargué el equipamiento: asumí un gimnasio comercial estándar.`);
